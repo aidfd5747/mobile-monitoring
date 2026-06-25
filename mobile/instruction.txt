@@ -1,0 +1,31 @@
+a. Input Restrictions 
+1. Field staff log in using the username and password registered by the administrator.
+2. Field staff can enter activity reports, including photos of the activity, a description of the work, the time of execution, and the GPS location.
+3. The administrator can enter staff data and field activity report categories.
+b.  Process Limitations 
+1.    The system manages the field activity reporting process through a mobile app used by field officers.
+2.    Field officers enter activity reports—including photos of the work, activity descriptions, execution times, and GPS locations—via their smartphones.
+3.    The system stores activity report data in Firebase Firestore in real time so that the data can be immediately received by the admin or management.
+4.    The system processes location data using GPS to determine the exact location of field work.
+5.    The system displays a history of activity reports sorted by officer name and activity date.
+6.    The system provides a monitoring dashboard that administrators or supervisors can use to monitor all field activity reports online.
+c.  Output Limitations
+The system displays field activity reports containing photos of the activity, a description of the work, the time of execution, and the GPS location.
+1.    The system displays the history of activity reports that have been submitted by field staff based on date and staff member name.
+2.    The system generates information on the location of field activities by displaying GPS coordinates in activity reports.
+3.    The system provides a monitoring dashboard that displays all field activity report data to administrators or managers in real time.
+4.    The system provides status information on activity reports that have been successfully submitted and saved to the database.
+
+   Programming Languages and Tools
+a.    Frontend: React Native (JavaScript)
+b.    Backend: Node.js 
+c.    Database: Firebase Firestore
+d.    Backend Hosting: Railway
+e.    Application Distribution: APK
+f.    Supporting Tools:
+-    VS Code (editor)
+-    Expo Go (testing & build)
+-    Firebase Console (Control Panel)
+-    GitHub (repository)
+
+Translated with DeepL.com (free version)
