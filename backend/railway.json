@@ -5,5 +5,8 @@
   },
   "deploy": {
     "startCommand": "npm run start"
+  },
+  "environments": {
+    "NIXPACKS_NODE_VERSION": "22"
   }
 }
