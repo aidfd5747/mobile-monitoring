@@ -12,6 +12,7 @@ import CreateReportScreen
 
 import ReportHistoryScreen
   from "../screens/report/reportHistoryScreen";
+import ReportDetailScreen from "../screens/report/reportDetailScreen";
 
 import ProfileScreen
   from "../screens/profile/profileScreen";
@@ -38,9 +39,19 @@ export default function MainTabs() {
         tabBarStyle: {
           backgroundColor: "#ffffff",
           borderTopColor: "#e2e8f0",
-          height: 64,
-          paddingBottom: 6,
+          height: 68,
+          paddingBottom: 8,
           paddingTop: 6,
+          position: "absolute",
+          bottom: 10,
+          left: 12,
+          right: 12,
+          borderRadius: 18,
+          elevation: 6,
+          shadowColor: "#0f172a",
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
         },
         headerStyle: {
           backgroundColor: "#2563eb",
@@ -69,13 +80,15 @@ export default function MainTabs() {
         component={isAdmin ? AdminDashboardScreen : DashboardScreen}
       />
 
-      <Tab.Screen
-        name="CreateReport"
-        component={CreateReportScreen}
-        options={{
-          title: "Laporan",
-        }}
-      />
+      {!isAdmin ? (
+        <Tab.Screen
+          name="CreateReport"
+          component={CreateReportScreen}
+          options={{
+            title: "Laporan",
+          }}
+        />
+      ) : null}
 
       <Tab.Screen
         name="ReportHistory"
@@ -94,13 +107,23 @@ export default function MainTabs() {
       />
 
       {isAdmin ? (
-        <Tab.Screen
-          name="CreateUser"
-          component={CreateUserScreen}
-          options={{
-            title: "Buat User",
-          }}
-        />
+        <>
+          <Tab.Screen
+            name="CreateUser"
+            component={CreateUserScreen}
+            options={{
+              title: "Buat User",
+            }}
+          />
+          <Tab.Screen
+            name="ReportDetail"
+            component={ReportDetailScreen}
+            options={{
+              title: "Detail Laporan",
+              tabBarButton: () => null,
+            }}
+          />
+        </>
       ) : null}
 
     </Tab.Navigator>

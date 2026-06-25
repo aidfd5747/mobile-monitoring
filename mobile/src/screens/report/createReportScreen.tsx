@@ -21,6 +21,7 @@ export default function CreateReportScreen() {
   const { location, error: locationError } = useLocation();
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("inspection");
+  const [customCategory, setCustomCategory] = useState("");
   const [loading, setLoading] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
@@ -34,19 +35,23 @@ export default function CreateReportScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       quality: 0.8,
     });
 
     if (!result.canceled) {
       const fileUri = result.assets[0].uri;
-      const base64 = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: "base64",
-      });
+      try {
+        const base64 = await FileSystem.readAsStringAsync(fileUri, {
+          encoding: "base64",
+        });
 
-      setPhotoUri(fileUri);
-      setPhotoBase64(base64);
+        setPhotoUri(fileUri);
+        setPhotoBase64(base64);
+      } catch (error) {
+        Alert.alert("Gagal", "Tidak bisa membaca foto yang dipilih");
+      }
     }
   };
 
@@ -58,11 +63,19 @@ export default function CreateReportScreen() {
 
     setLoading(true);
     try {
+      const resolvedCategoryName = customCategory.trim()
+        ? customCategory.trim()
+        : category === "inspection"
+          ? "Inspeksi Lapangan"
+          : category === "visit"
+            ? "Kunjungan Petugas"
+            : "Pemeliharaan";
+
       const payload = {
         petugasId: user?.id || "unknown",
         petugasName: user?.nama || "Petugas",
         categoryId: category,
-        categoryName: category === "inspection" ? "Inspeksi Lapangan" : category === "visit" ? "Kunjungan Petugas" : "Pemeliharaan",
+        categoryName: resolvedCategoryName,
         description,
         photoUrl: photoUri || "",
         photoBase64: photoBase64 || undefined,
@@ -75,6 +88,8 @@ export default function CreateReportScreen() {
       await api.post("/reports", payload);
       Alert.alert("Berhasil", "Laporan berhasil dikirim");
       setDescription("");
+      setCustomCategory("");
+      setCategory("inspection");
       setPhotoUri(null);
       setPhotoBase64(null);
     } catch (err) {
@@ -95,9 +110,11 @@ export default function CreateReportScreen() {
         <Text style={styles.label}>Kategori</Text>
         <TextInput
           style={styles.input}
-          value={category === "inspection" ? "Inspeksi Lapangan" : category === "visit" ? "Kunjungan Petugas" : "Pemeliharaan"}
-          editable={false}
+          placeholder="Masukkan kategori sendiri"
+          value={customCategory}
+          onChangeText={setCustomCategory}
         />
+        <Text style={styles.helperText}>Kosongkan jika ingin memakai kategori default.</Text>
 
         <Text style={styles.label}>Deskripsi kegiatan</Text>
         <TextInput
@@ -190,6 +207,12 @@ const styles = StyleSheet.create({
   helper: {
     color: "#dc2626",
     marginBottom: 10,
+  },
+  helperText: {
+    color: "#64748b",
+    marginTop: -8,
+    marginBottom: 12,
+    fontSize: 12,
   },
   imageButton: {
     backgroundColor: "#e0e7ff",

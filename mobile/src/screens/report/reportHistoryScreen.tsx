@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Animated, TouchableOpacity, Alert } from "react-native";
 import { useContext, useEffect, useRef, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
@@ -15,9 +16,9 @@ interface ReportItem {
 
 export default function ReportHistoryScreen() {
   const { user } = useContext(AuthContext);
+  const navigation = useNavigation<any>();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const isAdmin = user?.role === "admin";
@@ -55,18 +56,8 @@ export default function ReportHistoryScreen() {
     outputRange: ["0deg", "360deg"],
   });
 
-  const updateStatus = async (reportId: string, currentStatus?: string) => {
-    const nextStatus = currentStatus === "completed" ? "submitted" : "completed";
-
-    setUpdatingId(reportId);
-    try {
-      await api.patch(`/reports/${reportId}/status`, { status: nextStatus });
-      setReports((prev) => prev.map((item) => item.id === reportId ? { ...item, status: nextStatus } : item));
-    } catch (error) {
-      Alert.alert("Gagal", "Tidak bisa memperbarui status laporan");
-    } finally {
-      setUpdatingId(null);
-    }
+  const openReportDetail = (report: ReportItem) => {
+    navigation.navigate("ReportDetail", { report });
   };
 
   if (loading) {
@@ -99,16 +90,8 @@ export default function ReportHistoryScreen() {
             <Text style={styles.description}>{item.description}</Text>
             <Text style={styles.date}>{item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "-"}</Text>
             {isAdmin ? (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => updateStatus(item.id, item.status)}
-                disabled={updatingId === item.id}
-              >
-                {updatingId === item.id ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.actionText}>{item.status === "completed" ? "Tandai pending" : "Tandai selesai"}</Text>
-                )}
+              <TouchableOpacity style={styles.actionButton} onPress={() => openReportDetail(item)}>
+                <Text style={styles.actionText}>Lihat Detail</Text>
               </TouchableOpacity>
             ) : null}
           </Animated.View>

@@ -9,4 +9,5 @@ export type MainTabParamList = {
   ReportHistory: undefined;
   Profile: undefined;
   CreateUser: undefined;
+  ReportDetail: { report?: any; reportId?: string } | undefined;
 };
