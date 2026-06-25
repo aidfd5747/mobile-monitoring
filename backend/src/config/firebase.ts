@@ -1,6 +1,5 @@
 import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import type { ServiceAccount } from "firebase-admin";
 import path from "path";
 
@@ -24,4 +23,3 @@ if (!process.env.FIREBASE_CONFIG) {
 }
 
 export const firestore = getFirestore();
-export const storage = getStorage();

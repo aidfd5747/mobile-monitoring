@@ -27,4 +27,24 @@ export class ReportController {
       return res.status(500).json({ message: "Gagal mengambil laporan" });
     }
   }
+
+  static async updateStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const reportId = Array.isArray(id) ? id[0] : id;
+      const nextStatus = typeof status === "string" ? status : "submitted";
+
+      if (!reportId || !nextStatus) {
+        return res.status(400).json({ message: "ID laporan dan status wajib diisi" });
+      }
+
+      const report = await ReportService.updateReportStatus(reportId, nextStatus);
+
+      return res.json({ message: "Status laporan berhasil diperbarui", report });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Gagal memperbarui status laporan" });
+    }
+  }
 }

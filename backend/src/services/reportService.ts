@@ -1,4 +1,5 @@
-import { firestore, storage } from "../config/firebase";
+import { firestore } from "../config/firebase";
+import { createClient } from "@supabase/supabase-js";
 
 interface FirestoreReport {
   id: string;
@@ -28,6 +29,11 @@ export interface ReportPayload {
   status?: string;
 }
 
+const supabase = createClient(
+  process.env.SUPABASE_URL || "",
+  process.env.SUPABASE_ANON_KEY || ""
+);
+
 export class ReportService {
   static async createReport(payload: ReportPayload) {
     const { photoBase64, photoName, ...rest } = payload;
@@ -35,19 +41,23 @@ export class ReportService {
 
     if (photoBase64) {
       try {
-        const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
+        const bucketName = process.env.SUPABASE_BUCKET || "reports";
         const fileName = photoName || `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-        const file = bucket.file(fileName);
         const buffer = Buffer.from(photoBase64, "base64");
 
-        await file.save(buffer, {
-          metadata: {
+        const { error: uploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(fileName, buffer, {
             contentType: "image/jpeg",
-          },
-        });
+            upsert: true,
+          });
 
-        await file.makePublic();
-        photoUrl = file.publicUrl();
+        if (!uploadError) {
+          const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+          photoUrl = data.publicUrl;
+        } else {
+          console.error("Photo upload failed", uploadError);
+        }
       } catch (error) {
         console.error("Photo upload failed", error);
       }
@@ -99,5 +109,26 @@ export class ReportService {
       { id: "visit", name: "Kunjungan Petugas" },
       { id: "maintenance", name: "Pemeliharaan" },
     ];
+  }
+
+  static async updateReportStatus(id: string, status: string) {
+    const docRef = firestore.collection("reports").doc(id);
+    const snapshot = await docRef.get();
+
+    if (!snapshot.exists) {
+      throw new Error("Report not found");
+    }
+
+    await docRef.update({
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const updatedSnapshot = await docRef.get();
+
+    return {
+      id: docRef.id,
+      ...updatedSnapshot.data(),
+    };
   }
 }
