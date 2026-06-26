@@ -59,14 +59,20 @@ export default function ReportDetailScreen() {
   }, [route.params?.report, route.params?.reportId]);
 
   const handleComplete = async () => {
-    if (!report?.id) return;
+    if (!report?.id) {
+      console.log("[report] complete blocked: missing report id");
+      return;
+    }
 
+    console.log("[report] updating status", { reportId: report.id, fromStatus: report.status });
     setProcessing(true);
     try {
-      await api.patch(`/reports/${report.id}/status`, { status: "completed" });
+      const response = await api.patch(`/reports/${report.id}/status`, { status: "completed" });
+      console.log("[report] status update response", response.status, response.data);
       setReport((prev) => prev ? { ...prev, status: "completed" } : prev);
       Alert.alert("Berhasil", "Laporan telah ditandai selesai");
     } catch (error) {
+      console.log("[report] status update failed", error);
       Alert.alert("Gagal", "Tidak bisa memperbarui status laporan");
     } finally {
       setProcessing(false);

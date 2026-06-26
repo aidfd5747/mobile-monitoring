@@ -38,9 +38,11 @@ export class ReportService {
   static async createReport(payload: ReportPayload) {
     const { photoBase64, photoName, ...rest } = payload;
     let photoUrl = rest.photoUrl || "";
+    console.log("[backend] report service create started", { petugasId: rest.petugasId, category: rest.categoryName, hasPhoto: Boolean(photoBase64) });
 
     if (photoBase64) {
       try {
+        console.log("[backend] uploading photo", { photoName, size: photoBase64.length });
         const bucketName = process.env.SUPABASE_BUCKET || "reports";
         const fileName = photoName || `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
         const buffer = Buffer.from(photoBase64, "base64");
@@ -55,8 +57,9 @@ export class ReportService {
         if (!uploadError) {
           const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
           photoUrl = data.publicUrl;
+          console.log("[backend] photo upload success", { fileName, photoUrl });
         } else {
-          console.error("Photo upload failed", uploadError);
+          console.error("[backend] photo upload failed", uploadError);
         }
       } catch (error) {
         console.error("Photo upload failed", error);
@@ -71,6 +74,7 @@ export class ReportService {
     });
 
     const snapshot = await docRef.get();
+    console.log("[backend] report created in firestore", { reportId: docRef.id, status: rest.status || "submitted" });
 
     return {
       id: docRef.id,
@@ -80,6 +84,7 @@ export class ReportService {
 
   static async getReports() {
     const snapshot = await firestore.collection("reports").get();
+    console.log("[backend] fetched reports from firestore", { count: snapshot.size });
 
     return snapshot.docs
       .map((doc) => ({
@@ -112,6 +117,7 @@ export class ReportService {
   }
 
   static async updateReportStatus(id: string, status: string) {
+    console.log("[backend] updating report status", { reportId: id, status });
     const docRef = firestore.collection("reports").doc(id);
     const snapshot = await docRef.get();
 

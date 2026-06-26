@@ -4,7 +4,12 @@ import { ReportService } from "../services/reportService";
 export class ReportController {
   static async create(req: Request, res: Response) {
     try {
+      console.log("[backend] create report request", {
+        body: req.body,
+        user: (req as any).user,
+      });
       const report = await ReportService.createReport(req.body);
+      console.log("[backend] create report success", { reportId: (report as any)?.id, status: (report as any)?.status });
 
       return res.status(201).json({
         message: "Laporan berhasil disimpan",
@@ -18,8 +23,10 @@ export class ReportController {
 
   static async list(req: Request, res: Response) {
     try {
+      console.log("[backend] list reports request", { user: (req as any).user });
       const reports = await ReportService.getReports();
       const categories = await ReportService.getCategories();
+      console.log("[backend] list reports success", { count: reports?.length, categories: categories?.length });
 
       return res.json({ reports, categories });
     } catch (error) {
@@ -34,12 +41,15 @@ export class ReportController {
       const { status } = req.body;
       const reportId = Array.isArray(id) ? id[0] : id;
       const nextStatus = typeof status === "string" ? status : "submitted";
+      console.log("[backend] update status request", { reportId, nextStatus, user: (req as any).user });
 
       if (!reportId || !nextStatus) {
+        console.log("[backend] update status invalid payload", { reportId, nextStatus });
         return res.status(400).json({ message: "ID laporan dan status wajib diisi" });
       }
 
       const report = await ReportService.updateReportStatus(reportId, nextStatus);
+      console.log("[backend] update status success", { reportId, nextStatus, updatedReport: report });
 
       return res.json({ message: "Status laporan berhasil diperbarui", report });
     } catch (error) {

@@ -27,36 +27,47 @@ export default function CreateReportScreen() {
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
 
   const pickImage = async () => {
+    console.log("[report] starting image selection");
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log("[report] media permission granted", permission.granted);
 
     if (!permission.granted) {
+      console.log("[report] media permission denied");
       Alert.alert("Izin dibutuhkan", "Izinkan akses foto untuk melampirkan gambar");
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 0.8,
+      selectionLimit: 1,
     });
+    console.log("[report] image picker result", result.canceled ? "canceled" : "selected");
 
     if (!result.canceled) {
       const fileUri = result.assets[0].uri;
+      console.log("[report] selected image uri", fileUri);
       try {
         const base64 = await FileSystem.readAsStringAsync(fileUri, {
           encoding: "base64",
         });
+        console.log("[report] image base64 loaded", base64.length);
 
         setPhotoUri(fileUri);
         setPhotoBase64(base64);
       } catch (error) {
+        console.log("[report] failed to read selected image", error);
         Alert.alert("Gagal", "Tidak bisa membaca foto yang dipilih");
       }
     }
   };
 
   const handleSubmit = async () => {
+    console.log("[report] submit started", { description, category, customCategory, photoUri: !!photoUri });
+
     if (!description.trim()) {
+      console.log("[report] submit blocked: empty description");
       Alert.alert("Data belum lengkap", "Isi deskripsi kegiatan");
       return;
     }
@@ -85,7 +96,9 @@ export default function CreateReportScreen() {
         status: "submitted",
       };
 
-      await api.post("/reports", payload);
+      console.log("[report] sending payload", payload);
+      const response = await api.post("/reports", payload);
+      console.log("[report] submit response", response.status, response.data);
       Alert.alert("Berhasil", "Laporan berhasil dikirim");
       setDescription("");
       setCustomCategory("");

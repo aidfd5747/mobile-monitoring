@@ -13,6 +13,7 @@ import CreateReportScreen
 import ReportHistoryScreen
   from "../screens/report/reportHistoryScreen";
 import ReportDetailScreen from "../screens/report/reportDetailScreen";
+import PrintReportsScreen from "../screens/report/printReportsScreen";
 
 import ProfileScreen
   from "../screens/profile/profileScreen";
@@ -66,6 +67,8 @@ export default function MainTabs() {
             iconName = focused ? "add-circle" : "add-circle-outline";
           } else if (route.name === "ReportHistory") {
             iconName = focused ? "list" : "list-outline";
+          } else if (route.name === "PrintReports") {
+            iconName = focused ? "print" : "print-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person-circle" : "person-circle-outline";
           }
@@ -113,6 +116,13 @@ export default function MainTabs() {
             component={CreateUserScreen}
             options={{
               title: "Buat User",
+            }}
+          />
+          <Tab.Screen
+            name="PrintReports"
+            component={PrintReportsScreen}
+            options={{
+              title: "Cetak Laporan",
             }}
           />
           <Tab.Screen
