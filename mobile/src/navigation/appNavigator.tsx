@@ -6,6 +6,7 @@ import LoginScreen from "../screens/auth/loginScreen";
 import { RootStackParamList } from "./types";
 import LoadingScreen from "../screens/loadingScreen";
 import MainTabs from "./mainTabs";
+import ReportDetailScreen from "../screens/report/reportDetailScreen";
 
 const Stack =
   createNativeStackNavigator<RootStackParamList>();
@@ -35,13 +36,23 @@ export default function AppNavigator() {
             }}
           />
         ) : (
-          <Stack.Screen
-            name="MainTabs"
-            component={MainTabs}
-            options={{
-              headerShown: false,
-            }}
-          />
+          <>
+            <Stack.Screen
+              name="MainTabs"
+              component={MainTabs}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="ReportDetail"
+              component={ReportDetailScreen}
+              options={{
+                title: "Detail Laporan",
+                headerShown: true,
+              }}
+            />
+          </>
         )}
 
       </Stack.Navigator>

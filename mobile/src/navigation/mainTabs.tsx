@@ -12,7 +12,6 @@ import CreateReportScreen
 
 import ReportHistoryScreen
   from "../screens/report/reportHistoryScreen";
-import ReportDetailScreen from "../screens/report/reportDetailScreen";
 import PrintReportsScreen from "../screens/report/printReportsScreen";
 
 import ProfileScreen
@@ -125,14 +124,6 @@ export default function MainTabs() {
             component={PrintReportsScreen}
             options={{
               title: "Cetak Laporan",
-            }}
-          />
-          <Tab.Screen
-            name="ReportDetail"
-            component={ReportDetailScreen}
-            options={{
-              title: "Detail Laporan",
-              tabBarButton: () => null,
             }}
           />
         </>

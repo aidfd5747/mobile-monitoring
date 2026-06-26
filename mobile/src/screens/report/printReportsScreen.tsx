@@ -23,6 +23,7 @@ interface ReportItem {
   status?: string;
   createdAt?: string;
   photoUrl?: string;
+  photoDataUrl?: string;
 }
 
 const escapeHtml = (value: string) =>
@@ -39,8 +40,9 @@ const buildPdfHtml = (reports: ReportItem[]) => {
       const date = report.createdAt
         ? new Date(report.createdAt).toLocaleString("id-ID")
         : "-";
-      const photoCell = report.photoUrl
-        ? `<img src="${escapeHtml(report.photoUrl)}" alt="Foto laporan" style="max-width: 140px; max-height: 100px; object-fit: cover;" />`
+      const photoSrc = report.photoDataUrl || report.photoUrl || "";
+      const photoCell = photoSrc
+        ? `<img src="${escapeHtml(photoSrc)}" alt="Foto laporan" style="max-width: 140px; max-height: 100px; object-fit: cover;" />`
         : "-";
 
       return `
@@ -164,7 +166,35 @@ export default function PrintReportsScreen() {
 
     setGenerating(true);
     try {
-      const html = buildPdfHtml(itemsToExport);
+      const enrichedItems = await Promise.all(
+        itemsToExport.map(async (report) => {
+          if (!report.photoUrl || report.photoUrl.startsWith("data:")) {
+            return report;
+          }
+
+          try {
+            const response = await fetch(report.photoUrl);
+            if (!response.ok) {
+              throw new Error("failed to fetch image");
+            }
+
+            const blob = await response.blob();
+            const photoDataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(new Error("failed to read image"));
+              reader.readAsDataURL(blob);
+            });
+
+            return { ...report, photoDataUrl };
+          } catch (error) {
+            console.warn("[print] failed to embed photo", error);
+            return report;
+          }
+        })
+      );
+
+      const html = buildPdfHtml(enrichedItems);
       console.log("[print] pdf html ready", html.length);
       const file = await Print.printToFileAsync({ html });
       console.log("[print] pdf created", file.uri);

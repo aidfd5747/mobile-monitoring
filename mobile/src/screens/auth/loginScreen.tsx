@@ -28,8 +28,9 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
+      const normalizedUsername = username.trim().toLowerCase();
       const response = await api.post("/auth/login", {
-        username,
+        username: normalizedUsername,
         password,
       });
 

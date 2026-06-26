@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
+  ReportDetail: { report?: any; reportId?: string } | undefined;
 };
 
 export type MainTabParamList = {

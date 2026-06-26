@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Animated, TouchableOpacity, Alert } from "react-native";
-import { useContext, useEffect, useRef, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
@@ -25,33 +25,49 @@ export default function ReportHistoryScreen() {
   const isAdmin = user?.role === "admin";
   const visibleReports = isAdmin ? reports : reports.filter((report) => report.petugasId === user?.id || report.petugasName === user?.nama);
 
+  const loadReports = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const response = await api.get("/reports");
+      setReports(response.data.reports || []);
+    } catch (err) {
+      setReports([]);
+    } finally {
+      setLoading(false);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [fadeAnim]);
+
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
         duration: 900,
         useNativeDriver: true,
       })
-    ).start();
+    );
 
-    const loadReports = async () => {
-      try {
-        const response = await api.get("/reports");
-        setReports(response.data.reports || []);
-      } catch (err) {
-        setReports([]);
-      } finally {
-        setLoading(false);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }).start();
-      }
+    animation.start();
+
+    return () => {
+      animation.stop();
     };
+  }, [spinAnim]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadReports();
+    }, [loadReports])
+  );
+
+  useEffect(() => {
     loadReports();
-  }, [fadeAnim, spinAnim]);
+  }, [loadReports]);
 
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
