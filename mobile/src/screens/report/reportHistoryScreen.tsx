@@ -7,6 +7,7 @@ import { AuthContext } from "../../context/authContext";
 
 interface ReportItem {
   id: string;
+  petugasId?: string;
   petugasName?: string;
   categoryName?: string;
   description: string;
@@ -22,6 +23,7 @@ export default function ReportHistoryScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const isAdmin = user?.role === "admin";
+  const visibleReports = isAdmin ? reports : reports.filter((report) => report.petugasId === user?.id || report.petugasName === user?.nama);
 
   useEffect(() => {
     Animated.loop(
@@ -75,7 +77,7 @@ export default function ReportHistoryScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Riwayat Laporan</Text>
       <FlatList
-        data={reports}
+        data={visibleReports}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 24 }}
         renderItem={({ item }) => (

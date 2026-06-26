@@ -82,9 +82,15 @@ export class ReportService {
     };
   }
 
-  static async getReports() {
-    const snapshot = await firestore.collection("reports").get();
-    console.log("[backend] fetched reports from firestore", { count: snapshot.size });
+  static async getReports(userId?: string) {
+    let query = firestore.collection("reports");
+
+    if (userId) {
+      query = query.where("petugasId", "==", userId) as typeof query;
+    }
+
+    const snapshot = await query.get();
+    console.log("[backend] fetched reports from firestore", { count: snapshot.size, userId });
 
     return snapshot.docs
       .map((doc) => ({

@@ -10,7 +10,7 @@ export default function ProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.title}>Profil</Text>
         <Text style={styles.label}>Nama: {user?.nama || "-"}</Text>
-        <Text style={styles.label}>Role: {user?.role || "-"}</Text>
+        <Text style={styles.label}>Role: {user?.role === "worker" ? "Pekerja" : user?.role || "-"}</Text>
       </View>
 
       <TouchableOpacity style={styles.button} onPress={logout}>

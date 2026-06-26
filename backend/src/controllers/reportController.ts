@@ -4,11 +4,16 @@ import { ReportService } from "../services/reportService";
 export class ReportController {
   static async create(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
       console.log("[backend] create report request", {
         body: req.body,
-        user: (req as any).user,
+        user: authUser,
       });
-      const report = await ReportService.createReport(req.body);
+
+      const report = await ReportService.createReport({
+        ...req.body,
+        petugasId: req.body?.petugasId || authUser?.id || "unknown",
+      });
       console.log("[backend] create report success", { reportId: (report as any)?.id, status: (report as any)?.status });
 
       return res.status(201).json({
@@ -23,8 +28,9 @@ export class ReportController {
 
   static async list(req: Request, res: Response) {
     try {
-      console.log("[backend] list reports request", { user: (req as any).user });
-      const reports = await ReportService.getReports();
+      const authUser = (req as any).user;
+      console.log("[backend] list reports request", { user: authUser });
+      const reports = await ReportService.getReports(authUser?.role === "admin" ? undefined : authUser?.id);
       const categories = await ReportService.getCategories();
       console.log("[backend] list reports success", { count: reports?.length, categories: categories?.length });
 

@@ -9,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
@@ -24,6 +24,13 @@ export default function CreateReportScreen() {
   const [loading, setLoading] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 250);
+  };
 
   const pickImage = async () => {
     Alert.alert("Pilih sumber foto", "Ambil foto langsung dari kamera atau pilih dari galeri", [
@@ -55,6 +62,7 @@ export default function CreateReportScreen() {
 
           setPhotoUri(asset.uri);
           setPhotoBase64(asset.base64);
+          scrollToBottom();
         },
       },
       {
@@ -86,6 +94,7 @@ export default function CreateReportScreen() {
 
           setPhotoUri(asset.uri);
           setPhotoBase64(asset.base64);
+          scrollToBottom();
         },
       },
     ]);
@@ -133,15 +142,21 @@ export default function CreateReportScreen() {
       setCategory("inspection");
       setPhotoUri(null);
       setPhotoBase64(null);
-    } catch (err) {
-      Alert.alert("Gagal", "Laporan gagal dikirim");
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Laporan gagal dikirim";
+      Alert.alert("Gagal", message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      ref={scrollViewRef}
+      contentContainerStyle={[styles.container, { paddingBottom: 140 }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.headerCard}>
         <Text style={styles.title}>Buat Laporan Aktivitas</Text>
         <Text style={styles.subtitle}>Tambahkan detail kegiatan, foto, dan lokasi GPS untuk monitoring lapangan.</Text>
