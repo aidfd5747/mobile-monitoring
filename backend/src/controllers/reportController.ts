@@ -41,6 +41,26 @@ export class ReportController {
     }
   }
 
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const reportId = Array.isArray(id) ? id[0] : id;
+      console.log("[backend] delete report request", { reportId, user: (req as any).user });
+
+      if (!reportId) {
+        return res.status(400).json({ message: "ID laporan wajib diisi" });
+      }
+
+      const deletedReport = await ReportService.deleteReport(reportId);
+      console.log("[backend] delete report success", { reportId, deletedReport });
+
+      return res.json({ message: "Laporan berhasil dihapus", report: deletedReport });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Gagal menghapus laporan" });
+    }
+  }
+
   static async updateStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;

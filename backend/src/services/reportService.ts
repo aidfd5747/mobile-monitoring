@@ -122,6 +122,23 @@ export class ReportService {
     ];
   }
 
+  static async deleteReport(id: string) {
+    console.log("[backend] deleting report", { reportId: id });
+    const docRef = firestore.collection("reports").doc(id);
+    const snapshot = await docRef.get();
+
+    if (!snapshot.exists) {
+      throw new Error("Report not found");
+    }
+
+    await docRef.delete();
+
+    return {
+      id: docRef.id,
+      deleted: true,
+    };
+  }
+
   static async updateReportStatus(id: string, status: string) {
     console.log("[backend] updating report status", { reportId: id, status });
     const docRef = firestore.collection("reports").doc(id);

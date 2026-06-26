@@ -23,6 +23,9 @@ export default function AdminDashboardScreen() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === "admin";
+  const visibleRecentReports = (summary?.recentReports ?? []).filter(
+    (item) => (item.status || "submitted").toLowerCase() === "submitted"
+  );
 
   const loadSummary = async () => {
     setLoading(true);
@@ -90,8 +93,8 @@ export default function AdminDashboardScreen() {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Laporan Terbaru</Text>
-        {summary?.recentReports?.length ? (
-          summary.recentReports.map((item) => (
+        {visibleRecentReports.length ? (
+          visibleRecentReports.map((item) => (
             <View key={item.id} style={styles.item}>
               <View style={styles.itemHeader}>
                 <View style={{ flex: 1 }}>

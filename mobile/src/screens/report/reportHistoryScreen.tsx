@@ -20,10 +20,13 @@ export default function ReportHistoryScreen() {
   const navigation = useNavigation<any>();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const isAdmin = user?.role === "admin";
-  const visibleReports = isAdmin ? reports : reports.filter((report) => report.petugasId === user?.id || report.petugasName === user?.nama);
+  const visibleReports = isAdmin
+    ? reports.filter((report) => (report.status || "submitted").toLowerCase() === "completed")
+    : reports.filter((report) => report.petugasId === user?.id || report.petugasName === user?.nama);
 
   const loadReports = useCallback(async () => {
     setLoading(true);
@@ -78,6 +81,28 @@ export default function ReportHistoryScreen() {
     navigation.navigate("ReportDetail", { report });
   };
 
+  const deleteReport = async (report: ReportItem) => {
+    Alert.alert("Hapus laporan", `Apakah Anda yakin ingin menghapus laporan milik ${report.petugasName || "petugas"}?`, [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeletingId(report.id);
+            await api.delete(`/reports/${report.id}`);
+            setReports((prev) => prev.filter((item) => item.id !== report.id));
+            Alert.alert("Berhasil", "Laporan berhasil dihapus");
+          } catch (error) {
+            Alert.alert("Gagal", "Tidak bisa menghapus laporan saat ini");
+          } finally {
+            setDeletingId(null);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -108,9 +133,22 @@ export default function ReportHistoryScreen() {
             <Text style={styles.description}>{item.description}</Text>
             <Text style={styles.date}>{item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "-"}</Text>
             {isAdmin ? (
-              <TouchableOpacity style={styles.actionButton} onPress={() => openReportDetail(item)}>
-                <Text style={styles.actionText}>Lihat Detail</Text>
-              </TouchableOpacity>
+              <View style={styles.adminActions}>
+                <TouchableOpacity style={styles.actionButton} onPress={() => openReportDetail(item)}>
+                  <Text style={styles.actionText}>Lihat Detail</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.deleteButton, deletingId === item.id && styles.deleteButtonDisabled]}
+                  onPress={() => deleteReport(item)}
+                  disabled={deletingId === item.id}
+                >
+                  {deletingId === item.id ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.deleteButtonText}>Hapus</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             ) : null}
           </Animated.View>
         )}
@@ -205,14 +243,37 @@ const styles = StyleSheet.create({
     color: "#64748b",
     fontSize: 12,
   },
-  actionButton: {
+  adminActions: {
+    flexDirection: "row",
+    gap: 8,
     marginTop: 10,
+  },
+  actionButton: {
     backgroundColor: "#2563eb",
     borderRadius: 10,
     paddingVertical: 8,
+    paddingHorizontal: 12,
     alignItems: "center",
+    flex: 1,
   },
   actionText: {
+    color: "#ffffff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: "#dc2626",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 72,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.7,
+  },
+  deleteButtonText: {
     color: "#ffffff",
     fontWeight: "700",
     fontSize: 12,
