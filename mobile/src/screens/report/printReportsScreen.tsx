@@ -22,6 +22,7 @@ interface ReportItem {
   description: string;
   status?: string;
   createdAt?: string;
+  photoUrl?: string;
 }
 
 const escapeHtml = (value: string) =>
@@ -38,6 +39,10 @@ const buildPdfHtml = (reports: ReportItem[]) => {
       const date = report.createdAt
         ? new Date(report.createdAt).toLocaleString("id-ID")
         : "-";
+      const photoCell = report.photoUrl
+        ? `<img src="${escapeHtml(report.photoUrl)}" alt="Foto laporan" style="max-width: 140px; max-height: 100px; object-fit: cover;" />`
+        : "-";
+
       return `
         <tr>
           <td>${index + 1}</td>
@@ -46,6 +51,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
           <td>${escapeHtml(report.description || "-")}</td>
           <td>${escapeHtml(report.status || "submitted")}</td>
           <td>${escapeHtml(date)}</td>
+          <td>${photoCell}</td>
         </tr>`;
     })
     .join("");
@@ -59,8 +65,9 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         h1 { font-size: 22px; margin-bottom: 8px; }
         p { color: #475569; margin-top: 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; }
         th { background-color: #eff6ff; }
+        img { border-radius: 6px; }
       </style>
     </head>
     <body>
@@ -75,6 +82,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
             <th>Deskripsi</th>
             <th>Status</th>
             <th>Tanggal</th>
+            <th>Foto</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>

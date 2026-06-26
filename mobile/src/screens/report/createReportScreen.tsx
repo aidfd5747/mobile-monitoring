@@ -26,44 +26,69 @@ export default function CreateReportScreen() {
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
 
   const pickImage = async () => {
-    console.log("[report] starting image selection");
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    console.log("[report] media permission granted", permission.granted);
+    Alert.alert("Pilih sumber foto", "Ambil foto langsung dari kamera atau pilih dari galeri", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Kamera",
+        onPress: async () => {
+          const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!cameraPermission.granted) {
+            Alert.alert("Izin dibutuhkan", "Izinkan akses kamera untuk mengambil foto");
+            return;
+          }
 
-    if (!permission.granted) {
-      console.log("[report] media permission denied");
-      Alert.alert("Izin dibutuhkan", "Izinkan akses foto untuk melampirkan gambar");
-      return;
-    }
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            quality: 0.8,
+            base64: true,
+          });
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-      base64: true,
-      selectionLimit: 1,
-    });
-    console.log("[report] image picker result", result.canceled ? "canceled" : "selected");
+          if (result.canceled) {
+            return;
+          }
 
-    if (result.canceled) {
-      return;
-    }
+          const asset = result.assets?.[0];
+          if (!asset?.uri || !asset.base64) {
+            Alert.alert("Gagal", "Foto tidak bisa dibaca");
+            return;
+          }
 
-    const asset = result.assets?.[0];
-    if (!asset?.uri) {
-      Alert.alert("Gagal", "Tidak ada foto yang dipilih");
-      return;
-    }
+          setPhotoUri(asset.uri);
+          setPhotoBase64(asset.base64);
+        },
+      },
+      {
+        text: "Galeri",
+        onPress: async () => {
+          const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!mediaPermission.granted) {
+            Alert.alert("Izin dibutuhkan", "Izinkan akses galeri untuk memilih foto");
+            return;
+          }
 
-    const base64 = asset.base64;
-    if (!base64) {
-      Alert.alert("Gagal", "Foto yang dipilih tidak bisa dibaca");
-      return;
-    }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+            base64: true,
+            selectionLimit: 1,
+          });
 
-    console.log("[report] selected image uri", asset.uri);
-    setPhotoUri(asset.uri);
-    setPhotoBase64(base64);
+          if (result.canceled) {
+            return;
+          }
+
+          const asset = result.assets?.[0];
+          if (!asset?.uri || !asset.base64) {
+            Alert.alert("Gagal", "Foto tidak bisa dibaca");
+            return;
+          }
+
+          setPhotoUri(asset.uri);
+          setPhotoBase64(asset.base64);
+        },
+      },
+    ]);
   };
 
   const handleSubmit = async () => {
