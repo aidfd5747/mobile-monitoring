@@ -1,6 +1,6 @@
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Alert } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
 
@@ -24,25 +24,33 @@ export default function AdminDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === "admin";
 
-  useEffect(() => {
-    const loadSummary = async () => {
-      try {
-        const response = await api.get("/reports/summary");
-        setSummary(response.data.summary);
-      } catch (error) {
-        setSummary({
-          totalReports: 0,
-          submitted: 0,
-          completed: 0,
-          recentReports: [],
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadSummary = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get("/reports/summary");
+      setSummary(response.data.summary);
+    } catch (error) {
+      setSummary({
+        totalReports: 0,
+        submitted: 0,
+        completed: 0,
+        recentReports: [],
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadSummary();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSummary();
+      return () => undefined;
+    }, [])
+  );
 
   const openReportDetail = (item: SummaryData["recentReports"][number]) => {
     navigation.navigate("ReportDetail", { report: item });

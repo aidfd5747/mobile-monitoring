@@ -43,6 +43,7 @@ export default function MainTabs() {
           height: 68,
           paddingBottom: 8,
           paddingTop: 6,
+          paddingHorizontal: 8,
           position: "absolute",
           bottom: 10,
           left: 12,
@@ -53,6 +54,11 @@ export default function MainTabs() {
           shadowOpacity: 0.08,
           shadowRadius: 10,
           shadowOffset: { width: 0, height: 4 },
+        },
+        tabBarItemStyle: {
+          flex: 1,
+          justifyContent: "center",
+          minWidth: 0,
         },
         headerStyle: {
           backgroundColor: "#2563eb",

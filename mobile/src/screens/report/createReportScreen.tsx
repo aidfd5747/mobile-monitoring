@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { useContext, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
 import api from "../../services/api";
@@ -38,29 +37,33 @@ export default function CreateReportScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
       quality: 0.8,
+      base64: true,
       selectionLimit: 1,
     });
     console.log("[report] image picker result", result.canceled ? "canceled" : "selected");
 
-    if (!result.canceled) {
-      const fileUri = result.assets[0].uri;
-      console.log("[report] selected image uri", fileUri);
-      try {
-        const base64 = await FileSystem.readAsStringAsync(fileUri, {
-          encoding: "base64",
-        });
-        console.log("[report] image base64 loaded", base64.length);
-
-        setPhotoUri(fileUri);
-        setPhotoBase64(base64);
-      } catch (error) {
-        console.log("[report] failed to read selected image", error);
-        Alert.alert("Gagal", "Tidak bisa membaca foto yang dipilih");
-      }
+    if (result.canceled) {
+      return;
     }
+
+    const asset = result.assets?.[0];
+    if (!asset?.uri) {
+      Alert.alert("Gagal", "Tidak ada foto yang dipilih");
+      return;
+    }
+
+    const base64 = asset.base64;
+    if (!base64) {
+      Alert.alert("Gagal", "Foto yang dipilih tidak bisa dibaca");
+      return;
+    }
+
+    console.log("[report] selected image uri", asset.uri);
+    setPhotoUri(asset.uri);
+    setPhotoBase64(base64);
   };
 
   const handleSubmit = async () => {
