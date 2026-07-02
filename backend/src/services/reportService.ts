@@ -30,8 +30,8 @@ export interface ReportPayload {
 }
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_ANON_KEY || ""
+  process.env.SUPABASE_URL || process.env.supabase_url || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.supabase_service_role_key || process.env.SUPABASE_ANON_KEY || process.env.supabase_anon_key || ""
 );
 
 export class ReportService {
