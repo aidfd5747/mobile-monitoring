@@ -36,7 +36,7 @@ const supabase = createClient(
 
 export class ReportService {
   static async createReport(payload: ReportPayload) {
-    const { photoBase64, photoName, ...rest } = payload;
+    const { photoBase64, photoName, photoUrl: unusedPhotoUrl, ...rest } = payload;
     let photoUrl = "";
     console.log("[backend] report service create started", { petugasId: rest.petugasId, category: rest.categoryName, hasPhoto: Boolean(photoBase64) });
 
