@@ -5,6 +5,9 @@ import jwt from "jsonwebtoken";
 import { AuthService } from "../services/authService";
 import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
+const getStringValue = (value: unknown): string =>
+  typeof value === "string" ? value : "";
+
 export class AuthController {
   static async createUser(req: Request, res: Response) {
     try {
@@ -98,15 +101,16 @@ export class AuthController {
         return res.status(401).json({ message: "Token tidak valid" });
       }
 
-      const { username, password } = req.body;
+      const username = getStringValue(req.body.username);
+      const password = getStringValue(req.body.password);
 
       if (!username && !password) {
         return res.status(400).json({ message: "Username atau password harus diisi" });
       }
 
       const updatedUser = await AuthService.updateUser(userId, {
-        username: username?.trim(),
-        password: password?.trim(),
+        username: username.trim() || undefined,
+        password: password.trim() || undefined,
       });
 
       return res.json({ user: updatedUser });
@@ -121,10 +125,8 @@ export class AuthController {
     res: Response
   ) {
     try {
-      const {
-        username,
-        password,
-      } = req.body;
+      const username = getStringValue(req.body.username);
+      const password = getStringValue(req.body.password);
 
       const user =
         await AuthService.findUserByUsername(
