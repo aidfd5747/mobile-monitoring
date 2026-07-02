@@ -44,7 +44,7 @@ export class AuthController {
 
   static async deleteUser(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const id = getStringValue(req.params.id);
 
       if (!id) {
         return res.status(400).json({ message: "ID user wajib disertakan" });
