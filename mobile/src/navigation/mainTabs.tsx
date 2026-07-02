@@ -17,6 +17,7 @@ import PrintReportsScreen from "../screens/report/printReportsScreen";
 import ProfileScreen
   from "../screens/profile/profileScreen";
 import CreateUserScreen from "../screens/admin/createUserScreen";
+import WorkerListScreen from "../screens/admin/workerListScreen";
 
 import {
   MainTabParamList,
@@ -68,6 +69,8 @@ export default function MainTabs() {
             iconName = focused ? "add-circle" : "add-circle-outline";
           } else if (route.name === "ReportHistory") {
             iconName = focused ? "list" : "list-outline";
+          } else if (route.name === "Workers") {
+            iconName = focused ? "people" : "people-outline";
           } else if (route.name === "PrintReports") {
             iconName = focused ? "print" : "print-outline";
           } else if (route.name === "Profile") {
@@ -117,6 +120,13 @@ export default function MainTabs() {
             component={CreateUserScreen}
             options={{
               title: "Buat User",
+            }}
+          />
+          <Tab.Screen
+            name="Workers"
+            component={WorkerListScreen}
+            options={{
+              title: "Data Pekerja",
             }}
           />
           <Tab.Screen

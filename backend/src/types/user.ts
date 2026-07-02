@@ -3,6 +3,6 @@ export interface User {
   nama: string;
   username: string;
   password: string;
-  role: "admin" | "petugas";
+  role: "admin" | "worker" | "petugas";
   createdAt: Date;
 }

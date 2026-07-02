@@ -18,4 +18,30 @@ router.post(
   AuthController.createUser
 );
 
+router.get(
+  "/users",
+  authMiddleware,
+  adminOnly,
+  AuthController.listUsers
+);
+
+router.get(
+  "/profile",
+  authMiddleware,
+  AuthController.getProfile
+);
+
+router.patch(
+  "/profile",
+  authMiddleware,
+  AuthController.updateProfile
+);
+
+router.delete(
+  "/users/:id",
+  authMiddleware,
+  adminOnly,
+  AuthController.deleteUser
+);
+
 export default router;

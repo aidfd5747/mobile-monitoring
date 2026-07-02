@@ -37,38 +37,40 @@ const supabase = createClient(
 export class ReportService {
   static async createReport(payload: ReportPayload) {
     const { photoBase64, photoName, ...rest } = payload;
-    let photoUrl = rest.photoUrl || "";
+    let photoUrl = "";
     console.log("[backend] report service create started", { petugasId: rest.petugasId, category: rest.categoryName, hasPhoto: Boolean(photoBase64) });
 
     if (photoBase64) {
-      try {
-        console.log("[backend] uploading photo", { photoName, size: photoBase64.length });
-        const bucketName = process.env.SUPABASE_BUCKET || "reports";
-        const fileName = photoName || `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-        const buffer = Buffer.from(photoBase64, "base64");
+      console.log("[backend] uploading photo", { photoName, size: photoBase64.length });
+      const bucketName = process.env.SUPABASE_BUCKET || "reports";
+      const fileName = photoName || `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const buffer = Buffer.from(photoBase64, "base64");
 
-        const { error: uploadError } = await supabase.storage
-          .from(bucketName)
-          .upload(fileName, buffer, {
-            contentType: "image/jpeg",
-            upsert: true,
-          });
+      const { error: uploadError } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, buffer, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
 
-        if (!uploadError) {
-          const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
-          photoUrl = data.publicUrl;
-          console.log("[backend] photo upload success", { fileName, photoUrl });
-        } else {
-          console.error("[backend] photo upload failed", uploadError);
-        }
-      } catch (error) {
-        console.error("Photo upload failed", error);
+      if (uploadError) {
+        console.error("[backend] photo upload failed", uploadError);
+        throw new Error("Gagal mengunggah foto laporan");
       }
+
+      const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+      if (!data?.publicUrl) {
+        console.error("[backend] failed to get public url for uploaded photo", { fileName, data });
+        throw new Error("Gagal mendapatkan URL foto laporan");
+      }
+
+      photoUrl = data.publicUrl;
+      console.log("[backend] photo upload success", { fileName, photoUrl });
     }
 
     const docRef = await firestore.collection("reports").add({
       ...rest,
-      photoUrl,
+      ...(photoUrl ? { photoUrl } : {}),
       createdAt: new Date().toISOString(),
       status: rest.status || "submitted",
     });

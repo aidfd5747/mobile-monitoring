@@ -3,7 +3,7 @@ import { firestore } from "../config/firebase";
 import { User } from "../types/user";
 
 export class AuthService {
-  static async createUser(payload: { nama: string; username: string; password: string; role: "admin" | "worker" }) {
+  static async createUser(payload: { nama: string; username: string; password: string; role: "admin" | "worker" | "petugas" }) {
     const normalizedUsername = payload.username.trim().toLowerCase();
     const existingUser = await this.findUserByUsername(normalizedUsername);
 
@@ -29,6 +29,66 @@ export class AuthService {
       ...snapshot.data(),
     } as User;
   }
+
+  static async listUsers() {
+    const snapshot = await firestore.collection("users").get();
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as User),
+    }));
+  }
+
+  static async findUserById(id: string) {
+    const doc = await firestore.collection("users").doc(id).get();
+
+    if (!doc.exists) {
+      return null;
+    }
+
+    return {
+      id: doc.id,
+      ...(doc.data() as User),
+    } as User;
+  }
+
+  static async deleteUser(id: string) {
+    const docRef = firestore.collection("users").doc(id);
+    await docRef.delete();
+  }
+
+  static async updateUser(id: string, payload: { username?: string; password?: string }) {
+    const updatePayload: Record<string, any> = {};
+
+    if (payload.username) {
+      const normalizedUsername = payload.username.trim().toLowerCase();
+      const existingUser = await this.findUserByUsername(normalizedUsername);
+
+      if (existingUser && existingUser.id !== id) {
+        throw new Error("Username sudah digunakan");
+      }
+
+      updatePayload.username = normalizedUsername;
+      updatePayload.normalizedUsername = normalizedUsername;
+    }
+
+    if (payload.password) {
+      updatePayload.password = await bcrypt.hash(payload.password, 10);
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      throw new Error("Tidak ada data yang diperbarui");
+    }
+
+    const docRef = firestore.collection("users").doc(id);
+    await docRef.update(updatePayload);
+
+    const snapshot = await docRef.get();
+    return {
+      id: snapshot.id,
+      ...(snapshot.data() as User),
+    } as User;
+  }
+
   static async findUserByUsername(
     username: string
   ) {
