@@ -1,7 +1,10 @@
+// reportController.ts
+// Mengatur logika endpoint laporan: buat, lihat, hapus, dan perbarui status.
 import { Request, Response } from "express";
 import { ReportService } from "../services/reportService";
 
 export class ReportController {
+  // Buat laporan baru berdasarkan request body.
   static async create(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
@@ -26,6 +29,7 @@ export class ReportController {
     }
   }
 
+  // Ambil daftar laporan. Admin melihat semua, worker hanya miliknya.
   static async list(req: Request, res: Response) {
     try {
       const authUser = (req as any).user;
@@ -41,6 +45,7 @@ export class ReportController {
     }
   }
 
+  // Hapus laporan dengan ID tertentu (hanya admin).
   static async delete(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -61,6 +66,7 @@ export class ReportController {
     }
   }
 
+  // Perbarui status laporan, seperti dari submitted ke completed.
   static async updateStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;

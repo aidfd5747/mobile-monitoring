@@ -1,8 +1,11 @@
+// authService.ts
+// Layanan user untuk operasi CRUD user dan autentikasi.
 import bcrypt from "bcryptjs";
 import { firestore } from "../config/firebase";
 import { User } from "../types/user";
 
 export class AuthService {
+  // Buat akun user baru dengan password hashed.
   static async createUser(payload: { nama: string; username: string; password: string; role: "admin" | "worker" | "petugas" }) {
     const normalizedUsername = payload.username.trim().toLowerCase();
     const existingUser = await this.findUserByUsername(normalizedUsername);
@@ -30,6 +33,7 @@ export class AuthService {
     } as User;
   }
 
+  // Ambil semua user dari koleksi users.
   static async listUsers() {
     const snapshot = await firestore.collection("users").get();
     return snapshot.docs.map((doc) => ({
@@ -38,6 +42,7 @@ export class AuthService {
     }));
   }
 
+  // Cari user berdasarkan ID dokumen Firestore.
   static async findUserById(id: string) {
     const doc = await firestore.collection("users").doc(id).get();
 
@@ -51,11 +56,13 @@ export class AuthService {
     } as User;
   }
 
+  // Hapus user berdasarkan ID.
   static async deleteUser(id: string) {
     const docRef = firestore.collection("users").doc(id);
     await docRef.delete();
   }
 
+  // Perbarui username atau password user.
   static async updateUser(id: string, payload: { username?: string; password?: string }) {
     const updatePayload: Record<string, any> = {};
 
@@ -89,6 +96,7 @@ export class AuthService {
     } as User;
   }
 
+  // Cari user berdasarkan username ter-normalisasi.
   static async findUserByUsername(
     username: string
   ) {
@@ -132,6 +140,7 @@ export class AuthService {
     } as User;
   }
 
+  // Verifikasi password plain-text terhadap hash stored.
   static async verifyPassword(
     plainPassword: string,
     hashedPassword: string

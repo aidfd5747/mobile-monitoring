@@ -8,7 +8,9 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  Linking,
 } from "react-native";
+import MapView, { Marker, UrlTile } from "react-native-maps";
 import { useRoute } from "@react-navigation/native";
 import api from "../../services/api";
 
@@ -30,6 +32,12 @@ export default function ReportDetailScreen() {
   const [report, setReport] = useState<ReportDetailItem | null>(route.params?.report ?? null);
   const [loading, setLoading] = useState(!route.params?.report);
   const [processing, setProcessing] = useState(false);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: route.params?.report?.latitude ?? -6.200000,
+    longitude: route.params?.report?.longitude ?? 106.816666,
+    latitudeDelta: 0.04,
+    longitudeDelta: 0.04,
+  });
 
   useEffect(() => {
     const loadReport = async () => {
@@ -57,6 +65,16 @@ export default function ReportDetailScreen() {
 
     loadReport();
   }, [route.params?.report, route.params?.reportId]);
+
+  useEffect(() => {
+    if (report?.latitude !== undefined && report?.longitude !== undefined) {
+      setMapRegion((prev) => ({
+        ...prev,
+        latitude: report.latitude,
+        longitude: report.longitude,
+      }));
+    }
+  }, [report]);
 
   const handleComplete = async () => {
     if (!report?.id) {
@@ -127,6 +145,31 @@ export default function ReportDetailScreen() {
             <Text style={styles.value}>{report.latitude.toFixed(4)}, {report.longitude.toFixed(4)}</Text>
           </>
         ) : null}
+
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+            onPress={() => {
+              if (report?.latitude !== undefined && report?.longitude !== undefined) {
+                const url = `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=18/${report.latitude}/${report.longitude}`;
+                Linking.openURL(url).catch(() => {
+                  Alert.alert("Gagal", "Tidak dapat membuka peta eksternal");
+                });
+              }
+            }}
+          >
+            <UrlTile
+              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maximumZ={19}
+              flipY={false}
+            />
+            {report.latitude !== undefined && report.longitude !== undefined ? (
+              <Marker coordinate={{ latitude: report.latitude, longitude: report.longitude }} />
+            ) : null}
+          </MapView>
+          <Text style={styles.mapHint}>Ketuk peta untuk membuka OpenStreetMap</Text>
+        </View>
 
         {report.photoUrl ? (
           <>
@@ -203,6 +246,24 @@ const styles = StyleSheet.create({
   submitted: {
     color: "#dc2626",
     fontWeight: "700",
+  },
+  mapContainer: {
+    height: 250,
+    borderRadius: 18,
+    overflow: "hidden",
+    marginTop: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  map: {
+    flex: 1,
+  },
+  mapHint: {
+    padding: 10,
+    color: "#64748b",
+    fontSize: 12,
+    backgroundColor: "#f8fafc",
   },
   photo: {
     width: "100%",

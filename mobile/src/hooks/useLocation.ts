@@ -1,3 +1,5 @@
+// useLocation.ts
+// Hook custom untuk mengambil lokasi GPS device.
 import { useEffect, useState } from "react";
 import * as Location from "expo-location";
 

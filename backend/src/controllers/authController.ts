@@ -1,3 +1,5 @@
+// authController.ts
+// Mengatur logika endpoint autentikasi, profil, dan manajemen user.
 import { Request, Response } from "express";
 
 import jwt from "jsonwebtoken";
@@ -5,10 +7,12 @@ import jwt from "jsonwebtoken";
 import { AuthService } from "../services/authService";
 import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
+// Utility untuk memastikan field body berisi string.
 const getStringValue = (value: unknown): string =>
   typeof value === "string" ? value : "";
 
 export class AuthController {
+  // Endpoint untuk membuat akun worker baru.
   static async createUser(req: Request, res: Response) {
     try {
       const { nama, username, password, role } = req.body;
@@ -31,6 +35,7 @@ export class AuthController {
     }
   }
 
+  // Endpoint untuk mengambil daftar user dengan peran worker.
   static async listUsers(req: Request, res: Response) {
     try {
       const users = await AuthService.listUsers();
@@ -42,6 +47,7 @@ export class AuthController {
     }
   }
 
+  // Endpoint untuk menghapus akun worker berdasarkan ID.
   static async deleteUser(req: Request, res: Response) {
     try {
       const id = getStringValue(req.params.id);
@@ -72,6 +78,7 @@ export class AuthController {
     }
   }
 
+  // Endpoint untuk mengambil data profil user yang sedang login.
   static async getProfile(req: AuthenticatedRequest, res: Response) {
     try {
       const userId = req.user?.id;

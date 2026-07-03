@@ -1,3 +1,6 @@
+// reportService.ts
+// Layanan untuk operasi laporan: upload foto, simpan ke Firestore,
+// ambil laporan, kategori, hapus, dan ubah status.
 import { firestore } from "../config/firebase";
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,12 +38,14 @@ const supabase = createClient(
 );
 
 export class ReportService {
+  // Buat laporan baru: unggah foto ke Supabase jika ada, lalu simpan ke Firestore.
   static async createReport(payload: ReportPayload) {
     const { photoBase64, photoName, photoUrl: unusedPhotoUrl, ...rest } = payload;
     let photoUrl = "";
     console.log("[backend] report service create started", { petugasId: rest.petugasId, category: rest.categoryName, hasPhoto: Boolean(photoBase64) });
 
     if (photoBase64) {
+      // Upload foto base64 ke Supabase Storage.
       console.log("[backend] uploading photo", { photoName, size: photoBase64.length });
       const bucketName = process.env.SUPABASE_BUCKET || "reports";
       const fileName = photoName || `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
@@ -68,6 +73,7 @@ export class ReportService {
       console.log("[backend] photo upload success", { fileName, photoUrl });
     }
 
+    // Simpan dokumen laporan di Firestore.
     const docRef = await firestore.collection("reports").add({
       ...rest,
       ...(photoUrl ? { photoUrl } : {}),
@@ -84,6 +90,7 @@ export class ReportService {
     };
   }
 
+  // Ambil laporan, optional hanya untuk petugas tertentu.
   static async getReports(userId?: string) {
     let query = firestore.collection("reports");
 
@@ -107,6 +114,7 @@ export class ReportService {
       });
   }
 
+  // Ambil daftar kategori dari Firestore.
   static async getCategories() {
     const snapshot = await firestore.collection("categories").get();
 
@@ -124,6 +132,7 @@ export class ReportService {
     ];
   }
 
+  // Hapus laporan berdasarkan ID.
   static async deleteReport(id: string) {
     console.log("[backend] deleting report", { reportId: id });
     const docRef = firestore.collection("reports").doc(id);
@@ -141,6 +150,7 @@ export class ReportService {
     };
   }
 
+  // Perbarui status laporan di Firestore.
   static async updateReportStatus(id: string, status: string) {
     console.log("[backend] updating report status", { reportId: id, status });
     const docRef = firestore.collection("reports").doc(id);

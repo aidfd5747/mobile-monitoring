@@ -9,6 +9,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { User } from "../types/user";
 
+// authContext.tsx
+// Context global untuk menyimpan session autentikasi di aplikasi.
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -22,6 +24,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
+// Context default yang dipakai oleh komponen lain.
 export const AuthContext =
   createContext<AuthContextType>(
     {} as AuthContextType
@@ -35,12 +38,15 @@ export function AuthProvider({
   children,
 }: Props) {
 
+  // State user yang sedang login.
   const [user, setUser] =
     useState<User | null>(null);
 
+  // State token JWT untuk API.
   const [token, setToken] =
     useState<string | null>(null);
 
+  // State loading saat session dipulihkan.
   const [loading, setLoading] =
     useState(true);
 
@@ -48,6 +54,7 @@ export function AuthProvider({
     restoreSession();
   }, []);
 
+  // Memulihkan session dari AsyncStorage saat aplikasi dimulai.
   const restoreSession =
     async () => {
 
@@ -87,6 +94,7 @@ export function AuthProvider({
       }
     };
 
+  // Simpan data user dan token ke storage saat login.
   const login =
     async (
       userData: User,
@@ -107,6 +115,7 @@ export function AuthProvider({
       setToken(tokenData);
     };
 
+  // Hapus session dari storage saat logout.
   const logout =
     async () => {
 

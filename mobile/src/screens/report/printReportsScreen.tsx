@@ -23,6 +23,8 @@ interface ReportItem {
   status?: string;
   createdAt?: string;
   photoUrl?: string;
+  latitude?: number;
+  longitude?: number;
   photoDataUrl?: string;
 }
 
@@ -53,6 +55,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
           <td>${escapeHtml(report.description || "-")}</td>
           <td>${escapeHtml(report.status || "submitted")}</td>
           <td>${escapeHtml(date)}</td>
+          <td>${report.latitude !== undefined && report.longitude !== undefined ? `<img src="https://staticmap.openstreetmap.de/staticmap.php?center=${report.latitude},${report.longitude}&zoom=15&size=200x120&markers=${report.latitude},${report.longitude},red-pushpin" alt="Lokasi" style="width:200px; height:120px; object-fit: cover;" />` : "-"}</td>
           <td>${photoCell}</td>
         </tr>`;
     })
@@ -84,6 +87,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
             <th>Deskripsi</th>
             <th>Status</th>
             <th>Tanggal</th>
+            <th>Lokasi</th>
             <th>Foto</th>
           </tr>
         </thead>

@@ -8,6 +8,8 @@ import LoadingScreen from "../screens/loadingScreen";
 import MainTabs from "./mainTabs";
 import ReportDetailScreen from "../screens/report/reportDetailScreen";
 
+// appNavigator.tsx
+// Navigasi utama aplikasi yang menampilkan layar login atau tab utama.
 const Stack =
   createNativeStackNavigator<RootStackParamList>();
 
@@ -19,6 +21,7 @@ export default function AppNavigator() {
   } = useContext(AuthContext);
 
   if (loading) {
+    // Tampilkan loading saat context autentikasi masih dipulihkan.
     return <LoadingScreen />;
   }
 

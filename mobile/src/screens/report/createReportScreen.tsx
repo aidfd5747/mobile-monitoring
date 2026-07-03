@@ -9,7 +9,8 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { useContext, useRef, useState } from "react";
+import MapView, { Marker, UrlTile, MapPressEvent } from "react-native-maps";
+import { useContext, useRef, useState, useEffect } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
@@ -24,6 +25,13 @@ export default function CreateReportScreen() {
   const [loading, setLoading] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: -6.200000,
+    longitude: 106.816666,
+    latitudeDelta: 0.04,
+    longitudeDelta: 0.04,
+  });
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const scrollToBottom = () => {
@@ -31,6 +39,30 @@ export default function CreateReportScreen() {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 250);
   };
+
+  useEffect(() => {
+    if (!selectedCoordinate && location) {
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+      setSelectedCoordinate(coords);
+      setMapRegion((prev) => ({
+        ...prev,
+        ...coords,
+      }));
+    }
+  }, [location, selectedCoordinate]);
+
+  useEffect(() => {
+    if (selectedCoordinate) {
+      setMapRegion((prev) => ({
+        ...prev,
+        latitude: selectedCoordinate.latitude,
+        longitude: selectedCoordinate.longitude,
+      }));
+    }
+  }, [selectedCoordinate]);
 
   const pickImage = async () => {
     Alert.alert("Pilih sumber foto", "Ambil foto langsung dari kamera atau pilih dari galeri", [
@@ -101,11 +133,16 @@ export default function CreateReportScreen() {
   };
 
   const handleSubmit = async () => {
-    console.log("[report] submit started", { description, category, customCategory, photoUri: !!photoUri });
+    console.log("[report] submit started", { description, category, customCategory, photoUri: !!photoUri, selectedCoordinate });
 
     if (!description.trim()) {
       console.log("[report] submit blocked: empty description");
       Alert.alert("Data belum lengkap", "Isi deskripsi kegiatan");
+      return;
+    }
+
+    if (!selectedCoordinate) {
+      Alert.alert("Pilih lokasi", "Tap pada peta untuk memilih lokasi aktivitas");
       return;
     }
 
@@ -127,8 +164,8 @@ export default function CreateReportScreen() {
         description,
         photoBase64: photoBase64 || undefined,
         photoName: photoBase64 ? `reports/${Date.now()}.jpg` : undefined,
-        latitude: location?.coords.latitude || 0,
-        longitude: location?.coords.longitude || 0,
+        latitude: selectedCoordinate.latitude,
+        longitude: selectedCoordinate.longitude,
         status: "submitted",
       };
 
@@ -190,10 +227,33 @@ export default function CreateReportScreen() {
         <Text style={styles.label}>Lokasi GPS</Text>
         <TextInput
           style={styles.input}
-          value={location ? `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}` : "Mencari lokasi..."}
+          value={selectedCoordinate
+            ? `${selectedCoordinate.latitude.toFixed(6)}, ${selectedCoordinate.longitude.toFixed(6)}`
+            : location
+              ? `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`
+              : "Mencari lokasi..."}
           editable={false}
         />
         {locationError ? <Text style={styles.helper}>{locationError}</Text> : null}
+
+        <View style={styles.mapContainer}>
+          <Text style={styles.mapLabel}>Pilih lokasi di peta</Text>
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+            onPress={(event: MapPressEvent) => {
+              setSelectedCoordinate(event.nativeEvent.coordinate);
+            }}
+            onRegionChangeComplete={(region) => setMapRegion(region)}
+          >
+            <UrlTile
+              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maximumZ={19}
+              flipY={false}
+            />
+            {selectedCoordinate ? <Marker coordinate={selectedCoordinate} /> : null}
+          </MapView>
+        </View>
 
         <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSubmit} disabled={loading}>
           {loading ? (
@@ -268,6 +328,23 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 12,
     fontSize: 12,
+  },
+  mapContainer: {
+    height: 300,
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  mapLabel: {
+    padding: 10,
+    backgroundColor: "#f8fafc",
+    color: "#334155",
+    fontWeight: "700",
+  },
+  map: {
+    flex: 1,
   },
   imageButton: {
     backgroundColor: "#e0e7ff",

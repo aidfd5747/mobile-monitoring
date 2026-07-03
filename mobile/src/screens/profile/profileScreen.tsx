@@ -111,19 +111,6 @@ export default function ProfileScreen() {
     </ScrollView>
   );
 }
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Profil</Text>
-        <Text style={styles.label}>Nama: {user?.nama || "-"}</Text>
-        <Text style={styles.label}>Role: {user?.role === "worker" ? "Pekerja" : user?.role || "-"}</Text>
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={logout}>
-        <Text style={styles.buttonText}>Logout</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -158,6 +145,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#334155",
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    backgroundColor: "#ffffff",
+  },
+  logoutButton: {
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  logoutButtonText: {
     color: "#ffffff",
     fontWeight: "700",
   },

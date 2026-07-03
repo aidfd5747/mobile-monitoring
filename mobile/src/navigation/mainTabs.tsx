@@ -25,6 +25,8 @@ import {
 import { useContext } from "react";
 import { AuthContext } from "../context/authContext";
 
+// mainTabs.tsx
+// Navigasi bottom tab utama untuk user worker dan admin.
 const Tab =
   createBottomTabNavigator<MainTabParamList>();
 
@@ -61,6 +63,7 @@ export default function MainTabs() {
         },
         headerTintColor: "#ffffff",
         tabBarIcon: ({ color, size, focused }) => {
+          // Pilih ikon sesuai nama route.
           let iconName: keyof typeof Ionicons.glyphMap = "home-outline";
 
           if (route.name === "Dashboard") {

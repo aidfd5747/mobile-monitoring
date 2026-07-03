@@ -1,3 +1,5 @@
+// authRoutes.ts
+// Definisi route untuk autentikasi, manajemen user, dan profil.
 import { Router } from "express";
 
 import { AuthController }
@@ -6,11 +8,13 @@ import { adminOnly, authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
 
+// Login user dan menghasilkan JWT.
 router.post(
   "/login",
   AuthController.login
 );
 
+// Hanya admin yang dapat membuat akun worker.
 router.post(
   "/users",
   authMiddleware,
@@ -25,18 +29,21 @@ router.get(
   AuthController.listUsers
 );
 
+// Ambil profil user yang sedang login.
 router.get(
   "/profile",
   authMiddleware,
   AuthController.getProfile
 );
 
+// Perbarui username atau password user yang sedang login.
 router.patch(
   "/profile",
   authMiddleware,
   AuthController.updateProfile
 );
 
+// Hapus akun worker berdasarkan ID.
 router.delete(
   "/users/:id",
   authMiddleware,
