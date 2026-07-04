@@ -24,7 +24,7 @@ export default function CreateUserScreen() {
           nama,
           username,
           password,
-          role: "worker",
+          role: "Petugas",
         },
         {
           headers: {
@@ -33,12 +33,12 @@ export default function CreateUserScreen() {
         }
       );
 
-      Alert.alert("Berhasil", "Akun worker berhasil dibuat");
+      Alert.alert("Berhasil", "Akun Petugas berhasil dibuat");
       setNama("");
       setUsername("");
       setPassword("");
     } catch (error) {
-      Alert.alert("Gagal", "Tidak bisa membuat akun worker");
+      Alert.alert("Gagal", "Tidak bisa membuat Akun Petugas");
     } finally {
       setLoading(false);
     }
@@ -47,7 +47,7 @@ export default function CreateUserScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Buat Akun Worker</Text>
+        <Text style={styles.title}>Buat Akun Petugas</Text>
         <Text style={styles.subtitle}>Admin dapat membuat akun petugas baru untuk tim lapangan.</Text>
 
         <Text style={styles.label}>Nama lengkap</Text>

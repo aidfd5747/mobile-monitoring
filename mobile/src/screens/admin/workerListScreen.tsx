@@ -51,9 +51,9 @@ export default function WorkerListScreen() {
               setDeletingId(worker.id);
               await api.delete(`/auth/users/${worker.id}`);
               setWorkers((prev) => prev.filter((item) => item.id !== worker.id));
-              Alert.alert("Berhasil", "Akun worker berhasil dihapus");
+              Alert.alert("Berhasil", "Akun Petugas berhasil dihapus");
             } catch (error) {
-              Alert.alert("Gagal", "Tidak bisa menghapus akun worker saat ini");
+              Alert.alert("Gagal", "Tidak bisa menghapus akun petugas saat ini");
             } finally {
               setDeletingId(null);
             }
@@ -73,8 +73,8 @@ export default function WorkerListScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Daftar Worker</Text>
-      <Text style={styles.subtitle}>Lihat akun worker dan hapus bila perlu.</Text>
+      <Text style={styles.title}>Daftar Petugas</Text>
+      <Text style={styles.subtitle}>Lihat Akun Petugas dan hapus bila perlu.</Text>
 
       <FlatList
         data={workers}
@@ -82,7 +82,7 @@ export default function WorkerListScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>Belum ada worker terdaftar.</Text>
+            <Text style={styles.emptyText}>Belum ada Petugas terdaftar.</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -90,7 +90,7 @@ export default function WorkerListScreen() {
             <View style={styles.cardInfo}>
               <Text style={styles.workerName}>{item.nama}</Text>
               <Text style={styles.workerMeta}>{item.username || "-"}</Text>
-              <Text style={styles.workerRole}>{item.role === "worker" ? "Worker" : item.role}</Text>
+              <Text style={styles.workerRole}>{item.role === "worker" ? "Petugas" : item.role}</Text>
             </View>
             <TouchableOpacity
               style={[styles.deleteButton, deletingId === item.id && styles.deleteButtonDisabled]}

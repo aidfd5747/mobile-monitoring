@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import api from "../../services/api";
@@ -26,6 +27,8 @@ interface ReportItem {
   latitude?: number;
   longitude?: number;
   photoDataUrl?: string;
+  mapCacheUri?: string;
+  mapDataUrl?: string;
 }
 
 const escapeHtml = (value: string) =>
@@ -36,6 +39,93 @@ const escapeHtml = (value: string) =>
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
+  const latRad = (latitude * Math.PI) / 180;
+  const n = 2 ** zoom;
+  const x = ((longitude + 180) / 360) * n;
+  const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  const xTile = Math.floor(x);
+  const yTile = Math.floor(y);
+  const xFrac = x - xTile;
+  const yFrac = y - yTile;
+  const xBase = xTile - 1;
+  const yBase = yTile - 1;
+  const subdomains = ["a", "b", "c"];
+  const tileUrl = (tx: number, ty: number) => `https://${subdomains[(tx + ty) % 3]}.tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+
+  const centerOffsetX = 90 - ((xTile - xBase) * 256 + xFrac * 256);
+  const centerOffsetY = 57.5 - ((yTile - yBase) * 256 + yFrac * 256);
+
+  return {
+    urls: [
+      tileUrl(xBase, yBase),
+      tileUrl(xBase + 1, yBase),
+      tileUrl(xBase + 2, yBase),
+      tileUrl(xBase, yBase + 1),
+      tileUrl(xBase + 1, yBase + 1),
+      tileUrl(xBase + 2, yBase + 1),
+      tileUrl(xBase, yBase + 2),
+      tileUrl(xBase + 1, yBase + 2),
+      tileUrl(xBase + 2, yBase + 2),
+    ],
+    translateX: centerOffsetX,
+    translateY: centerOffsetY,
+    tileOffsetX: 110 - (256 + xFrac * 256),
+    tileOffsetY: 70 - (256 + yFrac * 256),
+    fractionX: xFrac,
+    fractionY: yFrac,
+  };
+};
+
+const getOsmTileUrl = (latitude: number, longitude: number, zoom = 15) => {
+  const tileInfo = getOsmTileGrid(latitude, longitude, zoom);
+  return { url: tileInfo.urls[4] };
+};
+
+const hashString = (value: string) =>
+  value.split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 0);
+
+const getMapCacheUri = (url: string) => {
+  const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
+  const fileName = `osm-map-${Math.abs(hashString(url))}.png`;
+  return `${cacheDir}${fileName}`;
+};
+
+const cacheMapFile = async (url: string): Promise<string | undefined> => {
+  try {
+    const fileUri = getMapCacheUri(url);
+    console.log("[print] cache directories", {
+      cacheDirectory: FileSystem.cacheDirectory,
+      documentDirectory: FileSystem.documentDirectory,
+      fileUri,
+    });
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    console.log("[print] cache file info", { exists: fileInfo.exists, uri: fileInfo.uri });
+    if (fileInfo.exists) {
+      console.log("[print] map cache hit", fileUri);
+      return fileUri;
+    }
+
+    console.log("[print] downloading map tile", url);
+    const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+    console.log("[print] download result", downloadResult);
+    if (downloadResult.status !== 200) {
+      throw new Error(`tile download failed with status ${downloadResult.status}`);
+    }
+
+    const downloadedFileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+    if (!downloadedFileInfo.exists || downloadedFileInfo.size === 0) {
+      throw new Error("tile download returned empty file");
+    }
+
+    console.log("[print] map cached", downloadResult.uri);
+    return downloadResult.uri;
+  } catch (error) {
+    console.warn("[print] failed to cache map image", error, url);
+    return undefined;
+  }
+};
+
 const buildPdfHtml = (reports: ReportItem[]) => {
   const rows = reports
     .map((report, index) => {
@@ -44,7 +134,18 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         : "-";
       const photoSrc = report.photoDataUrl || report.photoUrl || "";
       const photoCell = photoSrc
-        ? `<img src="${escapeHtml(photoSrc)}" alt="Foto laporan" style="max-width: 140px; max-height: 100px; object-fit: cover;" />`
+        ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" width="180" height="115" /></div>`
+        : "-";
+      const tileInfo = report.latitude !== undefined && report.longitude !== undefined
+        ? getOsmTileGrid(report.latitude, report.longitude)
+        : undefined;
+      const mapCell = report.latitude !== undefined && report.longitude !== undefined
+        ? `<div class="map-wrapper">
+            <div class="tile-grid" style="transform: translate(${tileInfo?.translateX}px, ${tileInfo?.translateY}px);">
+              ${tileInfo?.urls.map((url, index) => `<img class="tile tile-${index + 1}" src="${escapeHtml(url)}" alt="" />`).join("")}
+            </div>
+            <span class="marker"></span>
+          </div>`
         : "-";
 
       return `
@@ -55,7 +156,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
           <td>${escapeHtml(report.description || "-")}</td>
           <td>${escapeHtml(report.status || "submitted")}</td>
           <td>${escapeHtml(date)}</td>
-          <td>${report.latitude !== undefined && report.longitude !== undefined ? `<img src="https://staticmap.openstreetmap.de/staticmap.php?center=${report.latitude},${report.longitude}&zoom=15&size=200x120&markers=${report.latitude},${report.longitude},red-pushpin" alt="Lokasi" style="width:200px; height:120px; object-fit: cover;" />` : "-"}</td>
+          <td>${mapCell}</td>
           <td>${photoCell}</td>
         </tr>`;
     })
@@ -66,13 +167,30 @@ const buildPdfHtml = (reports: ReportItem[]) => {
     <head>
       <meta charset="utf-8" />
       <style>
+        @page { size: A4 landscape; margin: 16mm; }
         body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
         h1 { font-size: 22px; margin-bottom: 8px; }
         p { color: #475569; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; table-layout: fixed; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; word-wrap: break-word; }
         th { background-color: #eff6ff; }
-        img { border-radius: 6px; }
+        th:nth-child(7), td:nth-child(7) { width: 180px; }
+        th:nth-child(8), td:nth-child(8) { width: 180px; }
+        .map-wrapper { position: relative; width: 180px; height: 115px; overflow: hidden; border-radius: 6px; }
+        .tile-grid { position: absolute; width: 768px; height: 768px; top: 0; left: 0; }
+        .tile { position: absolute; width: 256px; height: 256px; }
+        .tile-1 { left: 0; top: 0; }
+        .tile-2 { left: 256px; top: 0; }
+        .tile-3 { left: 512px; top: 0; }
+        .tile-4 { left: 0; top: 256px; }
+        .tile-5 { left: 256px; top: 256px; }
+        .tile-6 { left: 512px; top: 256px; }
+        .tile-7 { left: 0; top: 512px; }
+        .tile-8 { left: 256px; top: 512px; }
+        .tile-9 { left: 512px; top: 512px; }
+        .marker { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; background: #dc2626; border: 2px solid #ffffff; border-radius: 50%; transform: translate(-50%, -50%); }
+        .image-cell { display: inline-block; width: 100%; max-width: 180px; height: 115px; overflow: hidden; }
+        .image-cell img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px; }
       </style>
     </head>
     <body>
@@ -172,41 +290,75 @@ export default function PrintReportsScreen() {
     try {
       const enrichedItems = await Promise.all(
         itemsToExport.map(async (report) => {
-          if (!report.photoUrl || report.photoUrl.startsWith("data:")) {
-            return report;
-          }
+          let photoDataUrl = report.photoDataUrl;
+          let mapCacheUri = report.mapCacheUri;
+          let mapDataUrl = report.mapDataUrl;
 
-          try {
-            const response = await fetch(report.photoUrl);
-            if (!response.ok) {
-              throw new Error("failed to fetch image");
+          if (report.photoUrl && !photoDataUrl && !report.photoUrl.startsWith("data:")) {
+            try {
+              const response = await fetch(report.photoUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                photoDataUrl = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = () => reject(new Error("failed to read image"));
+                  reader.readAsDataURL(blob);
+                });
+              }
+            } catch (error) {
+              console.warn("[print] failed to embed photo", error);
             }
-
-            const blob = await response.blob();
-            const photoDataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(new Error("failed to read image"));
-              reader.readAsDataURL(blob);
-            });
-
-            return { ...report, photoDataUrl };
-          } catch (error) {
-            console.warn("[print] failed to embed photo", error);
-            return report;
           }
+
+          if (
+            report.latitude !== undefined &&
+            report.longitude !== undefined &&
+            !mapCacheUri
+          ) {
+            const tileInfo = getOsmTileUrl(report.latitude, report.longitude);
+            console.log("[print] map tile url", tileInfo.url, { latitude: report.latitude, longitude: report.longitude });
+            mapCacheUri = await cacheMapFile(tileInfo.url);
+            console.log("[print] map cache uri result", mapCacheUri);
+          }
+
+          if (mapCacheUri && !mapDataUrl) {
+            try {
+              const base64 = await FileSystem.readAsStringAsync(mapCacheUri, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+              mapDataUrl = `data:image/png;base64,${base64}`;
+              console.log("[print] map data url length", mapDataUrl.length);
+              console.log("[print] map data url prefix", mapDataUrl.slice(0, 80));
+            } catch (error) {
+              console.warn("[print] failed to read cached map as base64", error, mapCacheUri);
+            }
+          }
+
+          return { ...report, photoDataUrl, mapCacheUri, mapDataUrl };
         })
       );
 
       const html = buildPdfHtml(enrichedItems);
       console.log("[print] pdf html ready", html.length);
-      const file = await Print.printToFileAsync({ html });
+      console.log("[print] starting pdf generation");
+      const file = await Print.printToFileAsync({ html, width: 842, height: 595 });
       console.log("[print] pdf created", file.uri);
-      await Sharing.shareAsync(file.uri, {
+      const fileInfo = await FileSystem.getInfoAsync(file.uri);
+      console.log("[print] pdf file info", fileInfo);
+      const canShare = await Sharing.isAvailableAsync();
+      console.log("[print] share available", canShare);
+      if (!canShare) {
+        throw new Error("Sharing is not available on this device");
+      }
+      console.log("[print] starting share dialog");
+      const shareResult = await Sharing.shareAsync(file.uri, {
         mimeType: "application/pdf",
         dialogTitle: "Bagikan laporan PDF",
         UTI: "com.adobe.pdf",
       });
+      console.log("[print] share result", shareResult);
+      console.log("[print] share complete");
     } catch (error) {
       Alert.alert("Gagal", "Tidak dapat membuat file PDF");
     } finally {
