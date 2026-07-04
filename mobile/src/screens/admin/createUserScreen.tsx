@@ -1,10 +1,14 @@
 import { useContext, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from "react-native";
 import { AuthContext } from "../../context/authContext";
 import api from "../../services/api";
+import { RootStackParamList } from "../../navigation/types";
 
 // Halaman admin untuk membuat akun petugas baru
 export default function CreateUserScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Token admin dari context untuk authorization request khusus
   const { token } = useContext(AuthContext);
   // Input nama petugas baru
@@ -38,9 +42,7 @@ export default function CreateUserScreen() {
       );
 
       Alert.alert("Berhasil", "Akun Petugas berhasil dibuat");
-      setNama("");
-      setUsername("");
-      setPassword("");
+      navigation.goBack();
     } catch (error) {
       Alert.alert("Gagal", "Tidak bisa membuat Akun Petugas");
     } finally {

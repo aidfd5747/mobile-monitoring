@@ -7,6 +7,7 @@ import { RootStackParamList } from "./types";
 import LoadingScreen from "../screens/loadingScreen";
 import MainTabs from "./mainTabs";
 import ReportDetailScreen from "../screens/report/reportDetailScreen";
+import CreateUserScreen from "../screens/admin/createUserScreen";
 
 // appNavigator.tsx
 // Navigasi utama aplikasi yang menampilkan layar login atau tab utama.
@@ -28,7 +29,14 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
 
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: "#2563eb",
+          },
+          headerTintColor: "#ffffff",
+        }}
+      >
 
         {!user ? (
           <Stack.Screen
@@ -48,11 +56,17 @@ export default function AppNavigator() {
               }}
             />
             <Stack.Screen
+              name="CreateUser"
+              component={CreateUserScreen}
+              options={{
+                title: "Buat Petugas",
+              }}
+            />
+            <Stack.Screen
               name="ReportDetail"
               component={ReportDetailScreen}
               options={{
                 title: "Detail Laporan",
-                headerShown: true,
               }}
             />
           </>

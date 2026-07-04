@@ -16,7 +16,6 @@ import PrintReportsScreen from "../screens/report/printReportsScreen";
 
 import ProfileScreen
   from "../screens/profile/profileScreen";
-import CreateUserScreen from "../screens/admin/createUserScreen";
 import WorkerListScreen from "../screens/admin/workerListScreen";
 
 import {
@@ -119,17 +118,10 @@ export default function MainTabs() {
       {isAdmin ? (
         <>
           <Tab.Screen
-            name="CreateUser"
-            component={CreateUserScreen}
-            options={{
-              title: "Buat User",
-            }}
-          />
-          <Tab.Screen
             name="Workers"
             component={WorkerListScreen}
             options={{
-              title: "Data Pekerja",
+              title: "Data Petugas",
             }}
           />
           <Tab.Screen

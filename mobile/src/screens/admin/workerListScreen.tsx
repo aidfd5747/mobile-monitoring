@@ -1,7 +1,10 @@
 import { useCallback, useContext, useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
+import { RootStackParamList } from "../../navigation/types";
 
 interface WorkerItem {
   id: string;
@@ -12,6 +15,7 @@ interface WorkerItem {
 
 // Halaman admin yang menampilkan daftar akun petugas dan penghapusan akun
 export default function WorkerListScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Data pengguna saat ini untuk memeriksa hak akses dan proteksi akun sendiri
   const { user } = useContext(AuthContext);
   // Daftar worker yang diambil dari API
@@ -32,9 +36,11 @@ export default function WorkerListScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadWorkers();
-  }, [loadWorkers]);
+  useFocusEffect(
+    useCallback(() => {
+      loadWorkers();
+    }, [loadWorkers])
+  );
 
   // Tampilkan dialog konfirmasi sebelum menghapus akun petugas
   const confirmDelete = (worker: WorkerItem) => {
@@ -44,7 +50,7 @@ export default function WorkerListScreen() {
     }
 
     Alert.alert(
-      "Hapus worker",
+      "Hapus Petugas",
       `Apakah Anda ingin menghapus akun ${worker.nama}?`,
       [
         { text: "Batal", style: "cancel" },
@@ -80,6 +86,11 @@ export default function WorkerListScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Daftar Petugas</Text>
       <Text style={styles.subtitle}>Lihat Akun Petugas dan hapus bila perlu.</Text>
+      <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate("CreateUser")}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.addButtonText}>Tambahkan Petugas</Text>
+      </TouchableOpacity>
 
       <FlatList
         data={workers}
@@ -189,6 +200,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
     alignItems: "center",
+  },
+  addButton: {
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  addButtonText: {
+    color: "#ffffff",
+    fontWeight: "700",
   },
   emptyText: {
     color: "#64748b",

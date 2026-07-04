@@ -86,7 +86,7 @@ export default function ProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.title}>Profil</Text>
         <Text style={styles.label}>Nama: {profile?.nama || user?.nama || "-"}</Text>
-        <Text style={styles.label}>Role: {user?.role === "worker" ? "Pekerja" : user?.role === "admin" ? "Administrator" : user?.role || "-"}</Text>
+        <Text style={styles.label}>Role: {user?.role === "worker" ? "Petugas" : user?.role === "admin" ? "Administrator" : user?.role || "-"}</Text>
       </View>
 
       {isWorker ? (
