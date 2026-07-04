@@ -32,7 +32,7 @@ export default function CreateUserScreen() {
           nama,
           username,
           password,
-          role: "Petugas",
+          role: "worker",
         },
         {
           headers: {
