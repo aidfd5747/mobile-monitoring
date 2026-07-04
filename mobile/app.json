@@ -33,8 +33,7 @@
       }
     },
     "plugins": [
-      "expo-font",
-      "react-native-maps"
+      "expo-font"
     ]
   }
 }
