@@ -27,10 +27,14 @@ interface ReportDetailItem {
   longitude?: number;
 }
 
+// Halaman detail untuk melihat dan mengubah status laporan tertentu
 export default function ReportDetailScreen() {
   const route = useRoute<any>();
+  // Data laporan yang ditampilkan di halaman detail
   const [report, setReport] = useState<ReportDetailItem | null>(route.params?.report ?? null);
+  // Status loading awal jika data belum dikirim lewat parameter
   const [loading, setLoading] = useState(!route.params?.report);
+  // Status pemrosesan permintaan update status laporan
   const [processing, setProcessing] = useState(false);
   const [mapRegion, setMapRegion] = useState({
     latitude: route.params?.report?.latitude ?? -6.200000,
@@ -39,6 +43,7 @@ export default function ReportDetailScreen() {
     longitudeDelta: 0.04,
   });
 
+  // Jika detail laporan tidak tersedia di params, ambil kembali dari backend
   useEffect(() => {
     const loadReport = async () => {
       if (route.params?.report) {
@@ -76,6 +81,7 @@ export default function ReportDetailScreen() {
     }
   }, [report]);
 
+  // Tandai laporan sebagai selesai dengan mengirim status ke backend
   const handleComplete = async () => {
     if (!report?.id) {
       console.log("[report] complete blocked: missing report id");

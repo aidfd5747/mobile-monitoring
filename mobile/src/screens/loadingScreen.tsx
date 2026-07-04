@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 
+// Layar sementara saat aplikasi memuat data atau menunggu proses
 export default function LoadingScreen() {
 
   return (

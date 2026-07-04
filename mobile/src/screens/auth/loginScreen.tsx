@@ -14,12 +14,18 @@ import { useState, useContext } from "react";
 import { AuthContext } from "../../context/authContext";
 import api from "../../services/api";
 
+// Layar login untuk autentikasi pengguna petugas
 export default function LoginScreen() {
+  // Fungsi login dari context autentikasi
   const { login } = useContext(AuthContext);
+  // Nilai input username pada form
   const [username, setUsername] = useState("");
+  // Nilai input password pada form
   const [password, setPassword] = useState("");
+  // Status loading saat menunggu respons API
   const [loading, setLoading] = useState(false);
 
+  // Tangani submit form login ke backend
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert("Lengkapi data", "Masukkan username dan password");

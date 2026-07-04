@@ -10,16 +10,23 @@ interface ProfileData {
   role: string;
 }
 
+// Layar profil pengguna, dengan opsi update username/password untuk petugas
 export default function ProfileScreen() {
   const { user, logout } = useContext(AuthContext);
+  // Profil detail yang terambil dari backend untuk petugas
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  // Status loading saat memuat data profil
   const [loading, setLoading] = useState(true);
+  // Status ketika menyimpan perubahan profil
   const [saving, setSaving] = useState(false);
+  // Input username baru
   const [username, setUsername] = useState("");
+  // Input password baru
   const [password, setPassword] = useState("");
 
   const isWorker = user?.role === "worker";
 
+  // Ambil data profil pengguna dari backend
   const loadProfile = useCallback(async () => {
     setLoading(true);
     try {
@@ -41,6 +48,7 @@ export default function ProfileScreen() {
     }
   }, [isWorker, loadProfile]);
 
+  // Simpan perubahan profil username/password ke backend
   const handleSave = async () => {
     if (!username.trim() && !password.trim()) {
       Alert.alert("Tidak ada perubahan", "Isi username atau password untuk memperbarui profil.");

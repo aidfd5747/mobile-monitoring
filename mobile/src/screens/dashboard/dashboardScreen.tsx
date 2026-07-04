@@ -3,9 +3,12 @@ import { useContext } from "react";
 import { AuthContext } from "../../context/authContext";
 import AppCard from "../../components/AppCard";
 
+// Layar dashboard utama yang menampilkan ringkasan untuk admin atau petugas
 export default function DashboardScreen() {
+  // Data pengguna saat ini untuk menentukan peran tampilan
   const { user } = useContext(AuthContext);
   const isAdmin = user?.role === "admin";
+  // Judul dan pesan yang berubah sesuai peran pengguna
   const greetingTitle = isAdmin ? "Dashboard Admin" : "Dashboard Petugas";
   const greetingText = isAdmin
     ? "Pantau kegiatan lapangan dan kelola laporan secara cepat."

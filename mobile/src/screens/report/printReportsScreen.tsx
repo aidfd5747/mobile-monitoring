@@ -16,6 +16,7 @@ import * as Sharing from "expo-sharing";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
 
+// Tipe data untuk satu item laporan yang dipilih atau ditampilkan
 interface ReportItem {
   id: string;
   petugasName?: string;
@@ -31,6 +32,7 @@ interface ReportItem {
   mapDataUrl?: string;
 }
 
+// Escape karakter HTML agar string aman digunakan di dalam konten HTML PDF
 const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
@@ -39,9 +41,13 @@ const escapeHtml = (value: string) =>
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+// Hitung grid tile OpenStreetMap dan offset untuk menempatkan posisi koordinat di tengah pratinjau
+// Hitung grid tile OpenStreetMap untuk preview peta dan offset penempatan marker
 const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
+  // Konversi lintang ke radian untuk perhitungan mercator
   const latRad = (latitude * Math.PI) / 180;
   const n = 2 ** zoom;
+  // Posisi tile dalam koordinat Web Mercator
   const x = ((longitude + 180) / 360) * n;
   const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
   const xTile = Math.floor(x);
@@ -53,6 +59,7 @@ const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
   const subdomains = ["a", "b", "c"];
   const tileUrl = (tx: number, ty: number) => `https://${subdomains[(tx + ty) % 3]}.tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
 
+  // Offset untuk menempatkan titik koordinat di tengah kotak preview
   const centerOffsetX = 90 - ((xTile - xBase) * 256 + xFrac * 256);
   const centerOffsetY = 57.5 - ((yTile - yBase) * 256 + yFrac * 256);
 
@@ -77,20 +84,24 @@ const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
   };
 };
 
+// Ambil URL tile pusat OSM sebagai fallback untuk caching
 const getOsmTileUrl = (latitude: number, longitude: number, zoom = 15) => {
   const tileInfo = getOsmTileGrid(latitude, longitude, zoom);
   return { url: tileInfo.urls[4] };
 };
 
+// Hitung hash sederhana dari string untuk nama file cache unik
 const hashString = (value: string) =>
   value.split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 0);
 
+// Bangun URI file cache lokal untuk URL tile peta yang diberikan
 const getMapCacheUri = (url: string) => {
   const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
   const fileName = `osm-map-${Math.abs(hashString(url))}.png`;
   return `${cacheDir}${fileName}`;
 };
 
+// Download tile peta jika belum ada di cache, lalu kembalikan URI lokalnya
 const cacheMapFile = async (url: string): Promise<string | undefined> => {
   try {
     const fileUri = getMapCacheUri(url);
@@ -126,19 +137,25 @@ const cacheMapFile = async (url: string): Promise<string | undefined> => {
   }
 };
 
+// Buat HTML laporan PDF dengan tabel berisi data laporan, preview peta, dan foto
 const buildPdfHtml = (reports: ReportItem[]) => {
   const rows = reports
     .map((report, index) => {
+      // Format tanggal laporan
       const date = report.createdAt
         ? new Date(report.createdAt).toLocaleString("id-ID")
         : "-";
+      // Sumber foto laporan berupa data URL atau URL biasa
       const photoSrc = report.photoDataUrl || report.photoUrl || "";
+      // Sel HTML untuk menampilkan foto laporan
       const photoCell = photoSrc
         ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" width="180" height="115" /></div>`
         : "-";
+      // Hitung informasi tile peta jika koordinat tersedia
       const tileInfo = report.latitude !== undefined && report.longitude !== undefined
         ? getOsmTileGrid(report.latitude, report.longitude)
         : undefined;
+      // Sel HTML untuk menampilkan pratinjau peta dalam laporan
       const mapCell = report.latitude !== undefined && report.longitude !== undefined
         ? `<div class="map-wrapper">
             <div class="tile-grid" style="transform: translate(${tileInfo?.translateX}px, ${tileInfo?.translateY}px);">
@@ -216,14 +233,21 @@ const buildPdfHtml = (reports: ReportItem[]) => {
 };
 
 export default function PrintReportsScreen() {
+  // Data pengguna saat ini dari context otentikasi
   const { user } = useContext(AuthContext);
+  // Daftar laporan yang dimuat dari backend
   const [reports, setReports] = useState<ReportItem[]>([]);
+  // Teks filter pencarian laporan
   const [search, setSearch] = useState("");
+  // ID laporan yang dipilih untuk dicetak
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Status loading saat mengambil daftar laporan
   const [loading, setLoading] = useState(true);
+  // Status sedang membuat PDF
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
+    // Ambil daftar laporan dari API saat komponen pertama kali dipasang
     const loadReports = async () => {
       try {
         const response = await api.get("/reports");
@@ -238,6 +262,7 @@ export default function PrintReportsScreen() {
     loadReports();
   }, []);
 
+  // Hitung daftar laporan yang cocok berdasarkan kata kunci pencarian
   const filteredReports = useMemo(() => {
     const normalized = search.trim().toLowerCase();
     console.log("[print] filtering reports", { search: normalized, total: reports.length });
@@ -260,12 +285,14 @@ export default function PrintReportsScreen() {
     });
   }, [reports, search]);
 
+  // Toggle pemilihan laporan pada daftar cetak
   const toggleSelection = (reportId: string) => {
     setSelectedIds((prev) =>
       prev.includes(reportId) ? prev.filter((item) => item !== reportId) : [...prev, reportId]
     );
   };
 
+  // Pilih semua laporan yang sedang ditampilkan atau batalkan pemilihannya
   const selectAll = () => {
     if (selectedIds.length === filteredReports.length) {
       setSelectedIds([]);
@@ -275,6 +302,7 @@ export default function PrintReportsScreen() {
     setSelectedIds(filteredReports.map((item) => item.id));
   };
 
+  // Buat dan bagikan file PDF berdasarkan laporan yang dipilih
   const handleGeneratePdf = async () => {
     const itemsToExport = reports.filter((report) => selectedIds.includes(report.id));
 
@@ -366,6 +394,7 @@ export default function PrintReportsScreen() {
     }
   };
 
+  // Render tampilan kartu untuk setiap laporan dalam daftar
   const renderItem = ({ item }: { item: ReportItem }) => {
     const isSelected = selectedIds.includes(item.id);
 

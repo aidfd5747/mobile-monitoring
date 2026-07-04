@@ -17,16 +17,22 @@ interface SummaryData {
   }>;
 }
 
+// Layar dashboard khusus admin untuk monitoring laporan dan ringkasan statistik
 export default function AdminDashboardScreen() {
+  // Data pengguna dan navigasi untuk membuka detail laporan
   const { user } = useContext(AuthContext);
   const navigation = useNavigation<any>();
+  // Ringkasan statistik laporan dari backend
   const [summary, setSummary] = useState<SummaryData | null>(null);
+  // Status loading saat memuat data summary
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === "admin";
+  // Hanya tampilkan laporan terbaru yang berstatus submitted
   const visibleRecentReports = (summary?.recentReports ?? []).filter(
     (item) => (item.status || "submitted").toLowerCase() === "submitted"
   );
 
+  // Ambil ringkasan laporan dari backend
   const loadSummary = async () => {
     setLoading(true);
     try {
@@ -55,6 +61,7 @@ export default function AdminDashboardScreen() {
     }, [])
   );
 
+  // Buka layar detail laporan ketika admin memilih item terbaru
   const openReportDetail = (item: SummaryData["recentReports"][number]) => {
     navigation.navigate("ReportDetail", { report: item });
   };

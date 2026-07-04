@@ -15,19 +15,25 @@ interface ReportItem {
   createdAt?: string;
 }
 
+// Halaman untuk menampilkan riwayat laporan dan tindakan admin/petugas
 export default function ReportHistoryScreen() {
+  // Data pengguna saat ini untuk menentukan akses dan filter
   const { user } = useContext(AuthContext);
   const navigation = useNavigation<any>();
+  // Daftar laporan yang diambil dari backend
   const [reports, setReports] = useState<ReportItem[]>([]);
+  // Status loading saat mengambil laporan
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const isAdmin = user?.role === "admin";
+  // Filter tampilan laporan berdasarkan peran admin atau petugas
   const visibleReports = isAdmin
     ? reports.filter((report) => (report.status || "submitted").toLowerCase() === "completed")
     : reports.filter((report) => report.petugasId === user?.id || report.petugasName === user?.nama);
 
+  // Ambil daftar laporan dari backend dan set animasi fade setelah selesai
   const loadReports = useCallback(async () => {
     setLoading(true);
 
@@ -77,10 +83,12 @@ export default function ReportHistoryScreen() {
     outputRange: ["0deg", "360deg"],
   });
 
+  // Buka halaman detail laporan ketika salah satu laporan diklik
   const openReportDetail = (report: ReportItem) => {
     navigation.navigate("ReportDetail", { report });
   };
 
+  // Hapus laporan dengan konfirmasi dari admin
   const deleteReport = async (report: ReportItem) => {
     Alert.alert("Hapus laporan", `Apakah Anda yakin ingin menghapus laporan milik ${report.petugasName || "petugas"}?`, [
       { text: "Batal", style: "cancel" },

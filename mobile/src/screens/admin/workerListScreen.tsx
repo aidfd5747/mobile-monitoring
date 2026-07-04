@@ -10,12 +10,16 @@ interface WorkerItem {
   role: string;
 }
 
+// Halaman admin yang menampilkan daftar akun petugas dan penghapusan akun
 export default function WorkerListScreen() {
+  // Data pengguna saat ini untuk memeriksa hak akses dan proteksi akun sendiri
   const { user } = useContext(AuthContext);
+  // Daftar worker yang diambil dari API
   const [workers, setWorkers] = useState<WorkerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Ambil data worker dari backend untuk ditampilkan di daftar
   const loadWorkers = useCallback(async () => {
     setLoading(true);
     try {
@@ -32,6 +36,7 @@ export default function WorkerListScreen() {
     loadWorkers();
   }, [loadWorkers]);
 
+  // Tampilkan dialog konfirmasi sebelum menghapus akun petugas
   const confirmDelete = (worker: WorkerItem) => {
     if (worker.id === user?.id) {
       Alert.alert("Tidak bisa", "Anda tidak dapat menghapus akun sendiri");

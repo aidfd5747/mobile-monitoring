@@ -3,13 +3,17 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView,
 import { AuthContext } from "../../context/authContext";
 import api from "../../services/api";
 
+// Halaman admin untuk membuat akun petugas baru
 export default function CreateUserScreen() {
+  // Token admin dari context untuk authorization request khusus
   const { token } = useContext(AuthContext);
+  // Input nama petugas baru
   const [nama, setNama] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Kirim request pembuatan akun petugas baru ke API admin
   const handleCreate = async () => {
     if (!nama.trim() || !username.trim() || !password.trim()) {
       Alert.alert("Data belum lengkap", "Isi semua field untuk membuat akun");

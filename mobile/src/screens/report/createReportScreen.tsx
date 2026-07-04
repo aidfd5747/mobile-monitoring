@@ -16,10 +16,15 @@ import { useLocation } from "../../hooks/useLocation";
 import api from "../../services/api";
 import OpenStreetMapView from "../../components/OpenStreetMapView";
 
+// Halaman untuk membuat laporan baru dengan foto, kategori, dan lokasi GPS
 export default function CreateReportScreen() {
+  // Data pengguna yang membuat laporan
   const { user } = useContext(AuthContext);
+  // Lokasi saat ini dari hook custom useLocation
   const { location, error: locationError } = useLocation();
+  // Input deskripsi laporan
   const [description, setDescription] = useState("");
+  // Pilihan kategori laporan
   const [category, setCategory] = useState("inspection");
   const [customCategory, setCustomCategory] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,6 +69,7 @@ export default function CreateReportScreen() {
     }
   }, [selectedCoordinate]);
 
+  // Pilih foto dari kamera atau galeri, lalu simpan sebagai base64
   const pickImage = async () => {
     Alert.alert("Pilih sumber foto", "Ambil foto langsung dari kamera atau pilih dari galeri", [
       { text: "Batal", style: "cancel" },
@@ -132,6 +138,7 @@ export default function CreateReportScreen() {
     ]);
   };
 
+  // Kirim data laporan ke backend setelah validasi input
   const handleSubmit = async () => {
     console.log("[report] submit started", { description, category, customCategory, photoUri: !!photoUri, selectedCoordinate });
 
