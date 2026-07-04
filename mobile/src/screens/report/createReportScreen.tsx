@@ -9,12 +9,12 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, UrlTile, MapPressEvent } from "react-native-maps";
 import { useContext, useRef, useState, useEffect } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
 import api from "../../services/api";
+import MapFallback from "../../components/MapFallback";
 
 export default function CreateReportScreen() {
   const { user } = useContext(AuthContext);
@@ -238,21 +238,15 @@ export default function CreateReportScreen() {
 
         <View style={styles.mapContainer}>
           <Text style={styles.mapLabel}>Pilih lokasi di peta</Text>
-          <MapView
+          <MapFallback
             style={styles.map}
             region={mapRegion}
-            onPress={(event: MapPressEvent) => {
-              setSelectedCoordinate(event.nativeEvent.coordinate);
+            onPress={(event) => {
+              setSelectedCoordinate(event.nativeEvent?.coordinate);
             }}
             onRegionChangeComplete={(region) => setMapRegion(region)}
-          >
-            <UrlTile
-              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
-            />
-            {selectedCoordinate ? <Marker coordinate={selectedCoordinate} /> : null}
-          </MapView>
+            markerCoordinate={selectedCoordinate}
+          />
         </View>
 
         <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSubmit} disabled={loading}>

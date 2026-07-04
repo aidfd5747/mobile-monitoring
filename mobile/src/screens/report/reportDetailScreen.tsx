@@ -10,9 +10,9 @@ import {
   Alert,
   Linking,
 } from "react-native";
-import MapView, { Marker, UrlTile } from "react-native-maps";
 import { useRoute } from "@react-navigation/native";
 import api from "../../services/api";
+import MapFallback from "../../components/MapFallback";
 
 interface ReportDetailItem {
   id: string;
@@ -147,7 +147,7 @@ export default function ReportDetailScreen() {
         ) : null}
 
         <View style={styles.mapContainer}>
-          <MapView
+          <MapFallback
             style={styles.map}
             region={mapRegion}
             onPress={() => {
@@ -158,16 +158,12 @@ export default function ReportDetailScreen() {
                 });
               }
             }}
-          >
-            <UrlTile
-              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
-            />
-            {report.latitude !== undefined && report.longitude !== undefined ? (
-              <Marker coordinate={{ latitude: report.latitude, longitude: report.longitude }} />
-            ) : null}
-          </MapView>
+            markerCoordinate={
+              report.latitude !== undefined && report.longitude !== undefined
+                ? { latitude: report.latitude, longitude: report.longitude }
+                : null
+            }
+          />
           <Text style={styles.mapHint}>Ketuk peta untuk membuka OpenStreetMap</Text>
         </View>
 
