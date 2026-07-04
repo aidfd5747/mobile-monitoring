@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import api from "../../services/api";
-import MapFallback from "../../components/MapFallback";
+import OpenStreetMapView from "../../components/OpenStreetMapView";
 
 interface ReportDetailItem {
   id: string;
@@ -147,17 +147,11 @@ export default function ReportDetailScreen() {
         ) : null}
 
         <View style={styles.mapContainer}>
-          <MapFallback
+          <OpenStreetMapView
             style={styles.map}
-            region={mapRegion}
-            onPress={() => {
-              if (report?.latitude !== undefined && report?.longitude !== undefined) {
-                const url = `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=18/${report.latitude}/${report.longitude}`;
-                Linking.openURL(url).catch(() => {
-                  Alert.alert("Gagal", "Tidak dapat membuka peta eksternal");
-                });
-              }
-            }}
+            latitude={mapRegion.latitude}
+            longitude={mapRegion.longitude}
+            zoom={14}
             markerCoordinate={
               report.latitude !== undefined && report.longitude !== undefined
                 ? { latitude: report.latitude, longitude: report.longitude }

@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
 import api from "../../services/api";
-import MapFallback from "../../components/MapFallback";
+import OpenStreetMapView from "../../components/OpenStreetMapView";
 
 export default function CreateReportScreen() {
   const { user } = useContext(AuthContext);
@@ -238,14 +238,14 @@ export default function CreateReportScreen() {
 
         <View style={styles.mapContainer}>
           <Text style={styles.mapLabel}>Pilih lokasi di peta</Text>
-          <MapFallback
+          <OpenStreetMapView
             style={styles.map}
-            region={mapRegion}
-            onPress={(event) => {
-              setSelectedCoordinate(event.nativeEvent?.coordinate);
-            }}
-            onRegionChangeComplete={(region) => setMapRegion(region)}
+            latitude={mapRegion.latitude}
+            longitude={mapRegion.longitude}
+            zoom={14}
+            interactive
             markerCoordinate={selectedCoordinate}
+            onCoordinateSelected={(coordinate) => setSelectedCoordinate(coordinate)}
           />
         </View>
 
