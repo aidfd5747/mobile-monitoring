@@ -137,82 +137,98 @@ const cacheMapFile = async (url: string): Promise<string | undefined> => {
   }
 };
 
-// Buat HTML laporan PDF dengan tabel berisi data laporan, preview peta, dan foto
+// Buat HTML laporan PDF dengan format yang mengikuti `format_laporan.html`
 const buildPdfHtml = (reports: ReportItem[]) => {
+  const categoryLabel =
+    reports.length === 1 ? reports[0].categoryName || "-" : "Semua";
+  const statusLabel =
+    reports.length === 1 ? reports[0].status || "-" : "Semua";
   const rows = reports
     .map((report, index) => {
-      // Format tanggal laporan
       const date = report.createdAt
-        ? new Date(report.createdAt).toLocaleString("id-ID")
+        ? new Date(report.createdAt).toLocaleDateString("id-ID")
         : "-";
-      // Sumber foto laporan berupa data URL atau URL biasa
+      const location =
+        report.latitude !== undefined && report.longitude !== undefined
+          ? `${report.latitude.toFixed(6)}, ${report.longitude.toFixed(6)}`
+          : "-";
       const photoSrc = report.photoDataUrl || report.photoUrl || "";
-      // Sel HTML untuk menampilkan foto laporan
       const photoCell = photoSrc
-        ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" width="180" height="115" /></div>`
-        : "-";
-      // Hitung informasi tile peta jika koordinat tersedia
-      const tileInfo = report.latitude !== undefined && report.longitude !== undefined
-        ? getOsmTileGrid(report.latitude, report.longitude)
-        : undefined;
-      // Sel HTML untuk menampilkan pratinjau peta dalam laporan
-      const mapCell = report.latitude !== undefined && report.longitude !== undefined
-        ? `<div class="map-wrapper">
-            <div class="tile-grid" style="transform: translate(${tileInfo?.translateX}px, ${tileInfo?.translateY}px);">
-              ${tileInfo?.urls.map((url, index) => `<img class="tile tile-${index + 1}" src="${escapeHtml(url)}" alt="" />`).join("")}
-            </div>
-            <span class="marker"></span>
-          </div>`
+        ? `<img src="${escapeHtml(photoSrc)}" alt="foto" />`
         : "-";
 
       return `
         <tr>
           <td>${index + 1}</td>
-          <td>${escapeHtml(report.petugasName || "Petugas")}</td>
+          <td>${escapeHtml(report.petugasName || "-")}</td>
           <td>${escapeHtml(report.categoryName || "-")}</td>
           <td>${escapeHtml(report.description || "-")}</td>
-          <td>${escapeHtml(report.status || "submitted")}</td>
+          <td>${escapeHtml(report.status || "-")}</td>
           <td>${escapeHtml(date)}</td>
-          <td>${mapCell}</td>
+          <td>${escapeHtml(location)}</td>
           <td>${photoCell}</td>
         </tr>`;
     })
     .join("");
 
+  const printedDate = new Date().toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
   return `<!DOCTYPE html>
   <html lang="id">
     <head>
-      <meta charset="utf-8" />
+      <meta charset="UTF-8" />
+      <title>Laporan Monitoring Kegiatan</title>
       <style>
-        @page { size: A4 landscape; margin: 16mm; }
-        body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
-        h1 { font-size: 22px; margin-bottom: 8px; }
-        p { color: #475569; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; table-layout: fixed; }
-        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; word-wrap: break-word; }
-        th { background-color: #eff6ff; }
-        th:nth-child(7), td:nth-child(7) { width: 180px; }
-        th:nth-child(8), td:nth-child(8) { width: 180px; }
-        .map-wrapper { position: relative; width: 180px; height: 115px; overflow: hidden; border-radius: 6px; }
-        .tile-grid { position: absolute; width: 768px; height: 768px; top: 0; left: 0; }
-        .tile { position: absolute; width: 256px; height: 256px; }
-        .tile-1 { left: 0; top: 0; }
-        .tile-2 { left: 256px; top: 0; }
-        .tile-3 { left: 512px; top: 0; }
-        .tile-4 { left: 0; top: 256px; }
-        .tile-5 { left: 256px; top: 256px; }
-        .tile-6 { left: 512px; top: 256px; }
-        .tile-7 { left: 0; top: 512px; }
-        .tile-8 { left: 256px; top: 512px; }
-        .tile-9 { left: 512px; top: 512px; }
-        .marker { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; background: #dc2626; border: 2px solid #ffffff; border-radius: 50%; transform: translate(-50%, -50%); }
-        .image-cell { display: inline-block; width: 100%; max-width: 180px; height: 115px; overflow: hidden; }
-        .image-cell img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px; }
+        @page { size: A4 landscape; margin: 20mm; }
+        body { font-family: "Times New Roman", serif; margin: 20px; color: #000; }
+        .header { display: flex; align-items: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 18px; }
+        .logo { width: 90px; height: 90px; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 20px; }
+        .header-text { flex: 1; text-align: center; }
+        .header-text h2, .header-text h3, .header-text p { margin: 2px; }
+        .title { text-align: center; margin-top: 24px; margin-bottom: 14px; }
+        .title h3 { margin: 0; text-decoration: underline; }
+        .info { margin-bottom: 14px; }
+        .info p { margin: 3px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        table, th, td { border: 1px solid black; }
+        th, td { padding: 8px; text-align: center; font-size: 11px; vertical-align: middle; word-break: break-word; }
+        th { background-color: #f0f0f0; }
+        th:nth-child(1), td:nth-child(1) { width: 4%; }
+        th:nth-child(2), td:nth-child(2) { width: 14%; }
+        th:nth-child(3), td:nth-child(3) { width: 12%; }
+        th:nth-child(4), td:nth-child(4) { width: 30%; text-align: left; }
+        th:nth-child(5), td:nth-child(5) { width: 10%; }
+        th:nth-child(6), td:nth-child(6) { width: 12%; }
+        th:nth-child(7), td:nth-child(7) { width: 12%; }
+        th:nth-child(8), td:nth-child(8) { width: 12%; }
+        td img { width: 100%; height: auto; max-height: 70px; object-fit: cover; }
+        .footer { width: 320px; margin-left: auto; margin-top: 32px; text-align: center; }
+        .signature { margin-top: 60px; }
+        @media print { body { margin: 10mm; } }
       </style>
     </head>
     <body>
-      <h1>Daftar Laporan Monitoring</h1>
-      <p>Dicetak dari aplikasi mobile monitoring.</p>
+      <div class="header">
+        <div class="logo">LOGO</div>
+        <div class="header-text">
+          <h2>DINAS PEKERJAAN UMUM DAN PENATAAN RUANG</h2>
+          <h3>Bidang Monitoring Kegiatan Lapangan</h3>
+          <p>Jl. Sultan Syarif Kasim No. XX Dumai</p>
+          <p>Telp. (0765) XXXXXXX</p>
+          <p>Email : pupr@dumai.go.id</p>
+        </div>
+      </div>
+      <div class="title">
+        <h3>LAPORAN MONITORING KEGIATAN</h3>
+      </div>
+      <div class="info">
+        <p><strong>Kategori</strong> : ${escapeHtml(categoryLabel)}</p>
+        <p><strong>Status</strong> : ${escapeHtml(statusLabel)}</p>
+      </div>
       <table>
         <thead>
           <tr>
@@ -228,6 +244,13 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         </thead>
         <tbody>${rows}</tbody>
       </table>
+      <div class="footer">
+        <p>Dumai, ${escapeHtml(printedDate)}</p>
+        <p>Mengetahui,</p>
+        <div class="signature">
+          <p><strong>Administrator</strong></p>
+        </div>
+      </div>
     </body>
   </html>`;
 };
