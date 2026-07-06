@@ -139,33 +139,37 @@ const cacheMapFile = async (url: string): Promise<string | undefined> => {
 
 // Buat HTML laporan PDF dengan format yang mengikuti `format_laporan.html`
 const buildPdfHtml = (reports: ReportItem[]) => {
-  const categoryLabel =
-    reports.length === 1 ? reports[0].categoryName || "-" : "Semua";
   const statusLabel =
     reports.length === 1 ? reports[0].status || "-" : "Semua";
   const rows = reports
     .map((report, index) => {
       const date = report.createdAt
-        ? new Date(report.createdAt).toLocaleDateString("id-ID")
+        ? new Date(report.createdAt).toLocaleString("id-ID")
         : "-";
-      const location =
-        report.latitude !== undefined && report.longitude !== undefined
-          ? `${report.latitude.toFixed(6)}, ${report.longitude.toFixed(6)}`
-          : "-";
       const photoSrc = report.photoDataUrl || report.photoUrl || "";
       const photoCell = photoSrc
-        ? `<img src="${escapeHtml(photoSrc)}" alt="foto" />`
+        ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" width="160" height="120" /></div>`
+        : "-";
+      const tileInfo = report.latitude !== undefined && report.longitude !== undefined
+        ? getOsmTileGrid(report.latitude, report.longitude)
+        : undefined;
+      const mapSrc = report.mapDataUrl ||
+        (report.latitude !== undefined && report.longitude !== undefined
+          ? getOsmTileUrl(report.latitude, report.longitude).url
+          : "");
+      const mapCell = mapSrc
+        ? `<img class="map-img" src="${escapeHtml(mapSrc)}" alt="Peta lokasi" width="160" height="120" />`
         : "-";
 
       return `
         <tr>
           <td>${index + 1}</td>
-          <td>${escapeHtml(report.petugasName || "-")}</td>
+          <td>${escapeHtml(report.petugasName || "Petugas")}</td>
           <td>${escapeHtml(report.categoryName || "-")}</td>
           <td>${escapeHtml(report.description || "-")}</td>
-          <td>${escapeHtml(report.status || "-")}</td>
+          <td>${escapeHtml(report.status || "submitted")}</td>
           <td>${escapeHtml(date)}</td>
-          <td>${escapeHtml(location)}</td>
+          <td>${mapCell}</td>
           <td>${photoCell}</td>
         </tr>`;
     })
@@ -180,35 +184,38 @@ const buildPdfHtml = (reports: ReportItem[]) => {
   return `<!DOCTYPE html>
   <html lang="id">
     <head>
-      <meta charset="UTF-8" />
-      <title>Laporan Monitoring Kegiatan</title>
+      <meta charset="utf-8" />
       <style>
-        @page { size: A4 landscape; margin: 20mm; }
-        body { font-family: "Times New Roman", serif; margin: 20px; color: #000; }
-        .header { display: flex; align-items: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 18px; }
+        @page { size: A4 landscape; margin: 16mm; }
+        body { font-family: "Times New Roman", serif; color: #000; margin: 24px; }
+        .header { display: flex; align-items: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
         .logo { width: 90px; height: 90px; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 20px; }
         .header-text { flex: 1; text-align: center; }
         .header-text h2, .header-text h3, .header-text p { margin: 2px; }
-        .title { text-align: center; margin-top: 24px; margin-bottom: 14px; }
-        .title h3 { margin: 0; text-decoration: underline; }
-        .info { margin-bottom: 14px; }
-        .info p { margin: 3px 0; }
+        .header-text h2 { font-size: 18px; text-transform: uppercase; }
+        .header-text h3 { font-size: 14px; margin-top: 4px; }
+        .header-text p { font-size: 12px; }
+        .title { text-align: center; margin-top: 24px; margin-bottom: 16px; }
+        .title h3 { margin: 0; text-decoration: underline; font-size: 16px; }
+        .info { display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-        table, th, td { border: 1px solid black; }
-        th, td { padding: 8px; text-align: center; font-size: 11px; vertical-align: middle; word-break: break-word; }
-        th { background-color: #f0f0f0; }
-        th:nth-child(1), td:nth-child(1) { width: 4%; }
-        th:nth-child(2), td:nth-child(2) { width: 14%; }
-        th:nth-child(3), td:nth-child(3) { width: 12%; }
-        th:nth-child(4), td:nth-child(4) { width: 30%; text-align: left; }
-        th:nth-child(5), td:nth-child(5) { width: 10%; }
-        th:nth-child(6), td:nth-child(6) { width: 12%; }
-        th:nth-child(7), td:nth-child(7) { width: 12%; }
-        th:nth-child(8), td:nth-child(8) { width: 12%; }
-        td img { width: 100%; height: auto; max-height: 70px; object-fit: cover; }
-        .footer { width: 320px; margin-left: auto; margin-top: 32px; text-align: center; }
+        table, th, td { border: 1px solid #000; }
+        th, td { padding: 8px; font-size: 12px; word-wrap: break-word; vertical-align: top; }
+        th { background-color: #f3f4f6; }
+        th:nth-child(1), td:nth-child(1) { width: 3%; }
+        th:nth-child(2), td:nth-child(2) { width: 10%; }
+        th:nth-child(3), td:nth-child(3) { width: 10%; }
+        th:nth-child(4), td:nth-child(4) { width: 24%; text-align: left; }
+        th:nth-child(5), td:nth-child(5) { width: 8%; }
+        th:nth-child(6), td:nth-child(6) { width: 8%; }
+        th:nth-child(7), td:nth-child(7) { width: 20%; text-align: left; }
+        th:nth-child(8), td:nth-child(8) { width: 17%; }
+        .map-img { width: 160px; height: 120px; object-fit: cover; border-radius: 4px; display: block; }
+        .image-cell { display: inline-block; width: 160px; height: 120px; overflow: hidden; }
+        .image-cell img { width: 160px; height: 120px; object-fit: cover; display: block; border-radius: 4px; }
+        .footer { width: 300px; margin-left: auto; margin-top: 44px; text-align: center; font-size: 12px; }
         .signature { margin-top: 60px; }
-        @media print { body { margin: 10mm; } }
+        @media print { body { margin: 20px; } }
       </style>
     </head>
     <body>
@@ -226,7 +233,6 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         <h3>LAPORAN MONITORING KEGIATAN</h3>
       </div>
       <div class="info">
-        <p><strong>Kategori</strong> : ${escapeHtml(categoryLabel)}</p>
         <p><strong>Status</strong> : ${escapeHtml(statusLabel)}</p>
       </div>
       <table>
@@ -262,6 +268,8 @@ export default function PrintReportsScreen() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   // Teks filter pencarian laporan
   const [search, setSearch] = useState("");
+  // Filter status (lowercase). Empty = no status filter applied.
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   // ID laporan yang dipilih untuk dicetak
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Status loading saat mengambil daftar laporan
@@ -285,28 +293,27 @@ export default function PrintReportsScreen() {
     loadReports();
   }, []);
 
-  // Hitung daftar laporan yang cocok berdasarkan kata kunci pencarian
+  // Hitung daftar laporan yang cocok berdasarkan kata kunci pencarian dan filter status
   const filteredReports = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    console.log("[print] filtering reports", { search: normalized, total: reports.length });
+    console.log("[print] filtering reports", { search: normalized, total: reports.length, statusFilters });
 
-    if (!normalized) {
-      return reports;
-    }
-
-    return reports.filter((report) => {
-      const haystack = [
-        report.petugasName,
-        report.categoryName,
-        report.description,
-        report.status,
-      ]
+    const matchesSearch = (report: ReportItem) => {
+      if (!normalized) return true;
+      const haystack = [report.petugasName, report.categoryName, report.description, report.status]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return haystack.includes(normalized);
-    });
-  }, [reports, search]);
+    };
+
+    const matchesStatus = (report: ReportItem) => {
+      if (!statusFilters || statusFilters.length === 0) return true;
+      return statusFilters.includes((report.status || "").toLowerCase());
+    };
+
+    return reports.filter((r) => matchesSearch(r) && matchesStatus(r));
+  }, [reports, search, statusFilters]);
 
   // Toggle pemilihan laporan pada daftar cetak
   const toggleSelection = (reportId: string) => {
@@ -323,6 +330,13 @@ export default function PrintReportsScreen() {
     }
 
     setSelectedIds(filteredReports.map((item) => item.id));
+  };
+
+  // Toggle status filter (completed/submitted)
+  const toggleStatusFilter = (status: string) => {
+    setStatusFilters((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
   };
 
   // Buat dan bagikan file PDF berdasarkan laporan yang dipilih
@@ -397,19 +411,61 @@ export default function PrintReportsScreen() {
       console.log("[print] pdf created", file.uri);
       const fileInfo = await FileSystem.getInfoAsync(file.uri);
       console.log("[print] pdf file info", fileInfo);
-      const canShare = await Sharing.isAvailableAsync();
-      console.log("[print] share available", canShare);
-      if (!canShare) {
-        throw new Error("Sharing is not available on this device");
+      let canShare = false;
+      try {
+        canShare = await Sharing.isAvailableAsync();
+      } catch (err) {
+        console.warn("[print] Sharing.isAvailableAsync failed", err);
+        canShare = false;
       }
-      console.log("[print] starting share dialog");
-      const shareResult = await Sharing.shareAsync(file.uri, {
-        mimeType: "application/pdf",
-        dialogTitle: "Bagikan laporan PDF",
-        UTI: "com.adobe.pdf",
-      });
-      console.log("[print] share result", shareResult);
-      console.log("[print] share complete");
+      console.log("[print] share available", canShare);
+
+      // Try normal sharing first. If not available, copy to cache and try again.
+      const tryShare = async (uri: string) => {
+        try {
+          console.log("[print] starting share dialog", uri);
+          const shareResult = await Sharing.shareAsync(uri, {
+            mimeType: "application/pdf",
+            dialogTitle: "Bagikan laporan PDF",
+            UTI: "com.adobe.pdf",
+          });
+          console.log("[print] share result", shareResult);
+          return true;
+        } catch (err) {
+          console.warn("[print] share failed", err);
+          return false;
+        }
+      };
+
+      let shared = false;
+      if (canShare) {
+        shared = await tryShare(file.uri);
+      }
+
+      if (!shared) {
+        // fallback: copy file to a public cache location and try share again
+        try {
+          const destDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
+          const dest = `${destDir}laporan-monitoring.pdf`;
+          console.log("[print] copying pdf to", dest);
+          await FileSystem.copyAsync({ from: file.uri, to: dest });
+          const destInfo = await FileSystem.getInfoAsync(dest);
+          console.log("[print] copied file info", destInfo);
+          const shareOk = await tryShare(dest);
+          if (!shareOk) {
+            Alert.alert(
+              "Berhasil membuat PDF",
+              `File disimpan di: ${dest}`
+            );
+          }
+        } catch (err) {
+          console.warn("[print] fallback share failed", err);
+          Alert.alert(
+            "Gagal membagikan",
+            `PDF dibuat tetapi tidak dapat dibagikan: ${file.uri}`
+          );
+        }
+      }
     } catch (error) {
       Alert.alert("Gagal", "Tidak dapat membuat file PDF");
     } finally {
@@ -454,6 +510,40 @@ export default function PrintReportsScreen() {
         value={search}
         onChangeText={setSearch}
       />
+
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            statusFilters.includes("completed") && styles.filterButtonActive,
+          ]}
+          onPress={() => toggleStatusFilter("completed")}
+        >
+          <Ionicons
+            name={statusFilters.includes("completed") ? "checkbox" : "square-outline"}
+            size={16}
+            color={statusFilters.includes("completed") ? "#ffffff" : "#2563eb"}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.filterButtonText, statusFilters.includes("completed") && styles.filterButtonTextActive]}>Completed</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            statusFilters.includes("submitted") && styles.filterButtonActive,
+          ]}
+          onPress={() => toggleStatusFilter("submitted")}
+        >
+          <Ionicons
+            name={statusFilters.includes("submitted") ? "checkbox" : "square-outline"}
+            size={16}
+            color={statusFilters.includes("submitted") ? "#ffffff" : "#2563eb"}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.filterButtonText, statusFilters.includes("submitted") && styles.filterButtonTextActive]}>Submitted</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.secondaryButton} onPress={selectAll}>
@@ -619,5 +709,32 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#64748b",
     marginTop: 5,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
+  },
+  filterButtonActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
+  },
+  filterButtonText: {
+    color: "#2563eb",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  filterButtonTextActive: {
+    color: "#ffffff",
   },
 });
