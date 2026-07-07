@@ -97,38 +97,57 @@ export default function MainTabs() {
             title: "Laporan",
           }}
         />
-      ) : null}
-
-      <Tab.Screen
-        name="ReportHistory"
-        component={ReportHistoryScreen}
-        options={{
-          title: "Riwayat",
-        }}
-      />
-
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          title: "Profil",
-        }}
-      />
-
-      {isAdmin ? (
+      ) : (
         <>
           <Tab.Screen
-            name="Workers"
-            component={WorkerListScreen}
+            name="ReportHistory"
+            component={ReportHistoryScreen}
             options={{
-              title: "Data Petugas",
+              title: "Riwayat Laporan",
             }}
           />
+
           <Tab.Screen
             name="PrintReports"
             component={PrintReportsScreen}
             options={{
               title: "Cetak Laporan",
+            }}
+          />
+
+          <Tab.Screen
+            name="Workers"
+            component={WorkerListScreen}
+            options={{
+              title: "Buat Akun Petugas",
+            }}
+          />
+
+          <Tab.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{
+              title: "Profil",
+            }}
+          />
+        </>
+      )}
+
+      {!isAdmin ? (
+        <>
+          <Tab.Screen
+            name="ReportHistory"
+            component={ReportHistoryScreen}
+            options={{
+              title: "Riwayat",
+            }}
+          />
+
+          <Tab.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{
+              title: "Profil",
             }}
           />
         </>
