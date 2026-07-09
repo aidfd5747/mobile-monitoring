@@ -56,7 +56,7 @@ export default function CreateUserScreen() {
         <Text style={styles.title}>Buat Akun Petugas</Text>
         <Text style={styles.subtitle}>Admin dapat membuat akun petugas baru untuk tim lapangan.</Text>
 
-        <Text style={styles.label}>Nama lengkap</Text>
+        <Text style={styles.label}>Nama Lengkap</Text>
         <TextInput style={styles.input} value={nama} onChangeText={setNama} placeholder="Contoh: Budi Santoso" />
 
         <Text style={styles.label}>Username</Text>
@@ -109,6 +109,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
+    fontWeight: "bold",
+    color: "black"
   },
   button: {
     backgroundColor: "#2563eb",

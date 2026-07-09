@@ -300,6 +300,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    color:"black"
   },
   label: {
     fontSize: 14,
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
-    backgroundColor: "#ffffff",
+    color: "black",
   },
   textArea: {
     minHeight: 120,

@@ -525,7 +525,7 @@ export default function PrintReportsScreen() {
             color={statusFilters.includes("completed") ? "#ffffff" : "#2563eb"}
             style={{ marginRight: 6 }}
           />
-          <Text style={[styles.filterButtonText, statusFilters.includes("completed") && styles.filterButtonTextActive]}>Completed</Text>
+          <Text style={[styles.filterButtonText, statusFilters.includes("completed") && styles.filterButtonTextActive]}>Selesai</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -541,7 +541,7 @@ export default function PrintReportsScreen() {
             color={statusFilters.includes("submitted") ? "#ffffff" : "#2563eb"}
             style={{ marginRight: 6 }}
           />
-          <Text style={[styles.filterButtonText, statusFilters.includes("submitted") && styles.filterButtonTextActive]}>Submitted</Text>
+          <Text style={[styles.filterButtonText, statusFilters.includes("submitted") && styles.filterButtonTextActive]}>Menunggu</Text>
         </TouchableOpacity>
       </View>
 
@@ -619,6 +619,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#ffffff",
     marginBottom: 10,
+    color: "black",
   },
   actionRow: {
     flexDirection: "row",
