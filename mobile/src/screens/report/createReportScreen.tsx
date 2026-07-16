@@ -26,22 +26,22 @@ export default function CreateReportScreen() {
   // Data pengguna yang membuat laporan
   const { user } = useContext(AuthContext);
   // Lokasi saat ini dari hook custom useLocation
-  const { location, error: locationError } = useLocation();
+  const { location, error: locationError, loading: locationLoading } = useLocation();
   // Input deskripsi laporan
   const [description, setDescription] = useState("");
   // Pilihan kategori laporan
   const [category, setCategory] = useState("inspection");
   const [customCategory, setCustomCategory] = useState("");
   const [loading, setLoading] = useState(false);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
-  const [photoWatermarkedBase64, setPhotoWatermarkedBase64] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Array<{ uri?: string; base64?: string; watermarkedBase64?: string }>>([]);
+  const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+  const [currentProcessingIndex, setCurrentProcessingIndex] = useState<number | null>(null);
   const [heading, setHeading] = useState<number>(0);
   const [showWatermarker, setShowWatermarker] = useState(false);
   const [addressParts, setAddressParts] = useState<any>({});
-  const previewUri = photoWatermarkedBase64
-    ? `data:image/jpeg;base64,${photoWatermarkedBase64}`
-    : photoUri;
+  const [watermarkAddress, setWatermarkAddress] = useState<any>(null);
+  const watermarkAddressRef = useRef<any>(null);
+  const previewUri = null;
   const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [mapRegion, setMapRegion] = useState({
@@ -59,6 +59,12 @@ export default function CreateReportScreen() {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 250);
   };
+
+  useEffect(() => {
+    if (showWatermarker) {
+      console.log('[report] showWatermarker=true, watermarkAddress:', watermarkAddress, 'addressParts:', addressParts, 'currentProcessingIndex:', currentProcessingIndex);
+    }
+  }, [showWatermarker]);
 
   useEffect(() => {
     if (!selectedCoordinate && location) {
@@ -85,7 +91,7 @@ export default function CreateReportScreen() {
   }, [selectedCoordinate]);
 
   useEffect(() => {
-    if (!route.params?.autoCamera || photoUri) {
+    if (!route.params?.autoCamera || photos.length > 0) {
       return;
     }
 
@@ -102,7 +108,7 @@ export default function CreateReportScreen() {
     };
 
     openCameraImmediately();
-  }, [route.params?.autoCamera, photoUri, cameraPermission?.granted, requestCameraPermission]);
+  }, [route.params?.autoCamera, photos.length, cameraPermission?.granted, requestCameraPermission]);
 
   // watch device heading while camera is open to use for compass needle
   useEffect(() => {
@@ -153,39 +159,165 @@ export default function CreateReportScreen() {
       return;
     }
 
-    setPhotoUri(result.uri);
-    setPhotoBase64(result.base64);
+    // replace photos list with the latest photo (single-photo mode)
+    setPhotos([{ uri: result.uri, base64: result.base64 }]);
+    setCurrentProcessingIndex(0);
+    if (result.width && result.height) {
+      setImageAspectRatio(result.width / result.height);
+    } else {
+      setImageAspectRatio(null);
+    }
     // perform reverse geocoding and watermarking then show preview
     try {
-      const lat = selectedCoordinate?.latitude ?? location?.coords.latitude;
-      const lon = selectedCoordinate?.longitude ?? location?.coords.longitude;
+      let lat = selectedCoordinate?.latitude ?? location?.coords.latitude;
+      let lon = selectedCoordinate?.longitude ?? location?.coords.longitude;
+
+      if ((lat == null || lon == null) && !locationError) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            lat = current.coords.latitude;
+            lon = current.coords.longitude;
+            if (!selectedCoordinate) {
+              const coords = { latitude: lat, longitude: lon };
+              setSelectedCoordinate(coords);
+              setMapRegion((prev) => ({ ...prev, ...coords }));
+            }
+          } else {
+            Alert.alert('Izin lokasi dibutuhkan', 'Izinkan akses lokasi untuk mendapatkan alamat otomatis.');
+          }
+        } catch (err) {
+          console.warn('[report] fallback GPS fetch failed', err);
+        }
+      }
+
+      const resolvedAddress = {
+        road: '',
+        suburb: '',
+        city: '',
+        state: '',
+        postcode: '',
+        latitude: lat,
+        longitude: lon,
+      };
+
       if (lat && lon) {
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=id&lat=${lat}&lon=${lon}`,
+            { headers: { 'User-Agent': 'mobile-monitoring/1.0' } }
           );
           if (res.ok) {
             const json = await res.json();
             const addr = json.address || {};
-            setAddressParts({
-              road: addr.road || addr.pedestrian || addr.footway || addr.cycleway || '',
-              suburb: addr.suburb || addr.village || addr.hamlet || '',
-              city: addr.city || addr.town || addr.municipality || addr.county || '',
-              state: addr.state || '',
+            const displayNameParts = (json.display_name || '').split(',').map((part: string) => part.trim()).filter(Boolean);
+            let nextAddress = {
+              ...resolvedAddress,
+              road: addr.road || addr.pedestrian || addr.footway || addr.cycleway || addr.path || addr.residential || addr.neighbourhood || addr.amenity || displayNameParts[0] || '',
+              suburb: addr.suburb || addr.neighbourhood || addr.city_district || addr.district || addr.county || addr.municipality || addr.region || displayNameParts[1] || '',
+              city: addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district || addr.region || displayNameParts[2] || '',
+              state: addr.state || addr.region || addr.province || addr.state_district || displayNameParts[3] || '',
               postcode: addr.postcode || '',
-            });
+            };
+
+            const isEmptyDetails = !nextAddress.road && !nextAddress.suburb && !nextAddress.city && !nextAddress.state;
+            if (isEmptyDetails) {
+                try {
+                const photonRes = await fetch(
+                  `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`
+                );
+                if (photonRes.ok) {
+                  const photonJson = await photonRes.json();
+                  const props = photonJson.features?.[0]?.properties || {};
+                  nextAddress = {
+                    ...nextAddress,
+                    road: nextAddress.road || props.street || props.name || props.housenumber || '',
+                    suburb: nextAddress.suburb || props.suburb || props.district || props.neighbourhood || props.city_district || '',
+                    city: nextAddress.city || props.city || props.town || props.village || props.state || '',
+                    state: nextAddress.state || props.state || props.region || '',
+                    postcode: nextAddress.postcode || props.postcode || props.postcode || '',
+                  };
+                }
+              } catch (photonErr) {
+                console.warn('[report] photon fallback failed', photonErr);
+              }
+            }
+
+            // If still empty, try Overpass to find nearby named ways/nodes (street/place)
+            const stillEmpty = !nextAddress.road && !nextAddress.suburb && !nextAddress.city && !nextAddress.state;
+            if (stillEmpty) {
+                try {
+                const overQ = `[out:json][timeout:25];(way(around:1000,${lat},${lon})["name"];node(around:1000,${lat},${lon})["addr:street"];way(around:1000,${lat},${lon})["highway"];node(around:1000,${lat},${lon})["place"];);out center;`;
+                const overRes = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: overQ });
+                if (overRes.ok) {
+                  const overJson = await overRes.json();
+                  const elements = overJson.elements || [];
+                  // Prefer elements that contain address-like tags (addr:street, name)
+                  let chosenTags: any = null;
+                  for (const e of elements) {
+                    if (e && e.tags) {
+                      const t = e.tags;
+                      if (t['addr:street'] || t.name) {
+                        chosenTags = t;
+                        break;
+                      }
+                    }
+                  }
+                  // fallback: pick first element that has any tags
+                  if (!chosenTags) {
+                    const anyWithTags = elements.find((e: any) => e && e.tags && Object.keys(e.tags).length > 0);
+                    chosenTags = anyWithTags ? anyWithTags.tags : {};
+                  }
+                  console.log('[report] overpass chosen tags', chosenTags);
+                  const tags = chosenTags || {};
+                  if (tags && Object.keys(tags).length > 0) {
+                    nextAddress = {
+                      ...nextAddress,
+                      road: nextAddress.road || tags['addr:street'] || tags.name || tags['ref'] || '',
+                      suburb: nextAddress.suburb || tags.suburb || tags.district || tags.neighbourhood || '',
+                      city: nextAddress.city || tags.city || tags.town || tags.village || tags.county || '',
+                      state: nextAddress.state || tags.state || tags.region || '',
+                      postcode: nextAddress.postcode || tags.postcode || '',
+                    };
+                  }
+                }
+              } catch (overErr) {
+                console.warn('[report] overpass fallback failed', overErr);
+              }
+            }
+
+              setAddressParts(nextAddress);
+              setWatermarkAddress(nextAddress);
+              watermarkAddressRef.current = nextAddress;
+              console.log('[report] resolvedAddress (from reverse)', nextAddress);
+          } else {
+            setAddressParts(resolvedAddress);
+            setWatermarkAddress(resolvedAddress);
+            watermarkAddressRef.current = resolvedAddress;
+            console.log('[report] resolvedAddress (fallback)', resolvedAddress);
           }
         } catch (err) {
           console.warn('[report] reverse geocode failed', err);
+          setAddressParts(resolvedAddress);
+          setWatermarkAddress(resolvedAddress);
+          watermarkAddressRef.current = resolvedAddress;
+          console.log('[report] resolvedAddress (error path)', resolvedAddress);
         }
+      } else {
+        setAddressParts(resolvedAddress);
+        setWatermarkAddress(resolvedAddress);
+        watermarkAddressRef.current = resolvedAddress;
+        console.log('[report] resolvedAddress (no coords)', resolvedAddress);
       }
 
       setShowCamera(false);
+      console.log('[report] opening watermarker', { currentProcessingIndex, photosLength: photos.length, watermarkAddress, watermarkAddressRef: watermarkAddressRef.current });
       setShowWatermarker(true);
       scrollToBottom();
     } catch (err) {
       setShowCamera(false);
-      setShowPhotoPreview(true);
+      // if watermarking failed, leave photo in list as-is
       scrollToBottom();
     }
   };
@@ -203,12 +335,12 @@ export default function CreateReportScreen() {
     setShowCamera(true);
   };
 
-  // Local state to show full-screen photo preview
+  // Local state: kept for backwards compatibility but not used as full-screen preview
   const [showPhotoPreview, setShowPhotoPreview] = useState(false);
 
   // Kirim data laporan ke backend setelah validasi input
   const handleSubmit = async () => {
-    console.log("[report] submit started", { description, category, customCategory, photoUri: !!photoUri, selectedCoordinate });
+    console.log("[report] submit started", { description, category, customCategory, photos: photos.length, selectedCoordinate });
 
     if (!description.trim()) {
       console.log("[report] submit blocked: empty description");
@@ -231,14 +363,15 @@ export default function CreateReportScreen() {
             ? "Kunjungan Petugas"
             : "Pemeliharaan";
 
+      const firstPhoto = photos[0];
       const payload = {
         petugasId: user?.id || "unknown",
         petugasName: user?.nama || "Petugas",
         categoryId: category,
         categoryName: resolvedCategoryName,
         description,
-        photoBase64: photoBase64 || undefined,
-        photoName: photoBase64 ? `reports/${Date.now()}.jpg` : undefined,
+        photoBase64: (firstPhoto?.watermarkedBase64 || firstPhoto?.base64) || undefined,
+        photoName: firstPhoto ? `reports/${Date.now()}.jpg` : undefined,
         latitude: selectedCoordinate.latitude,
         longitude: selectedCoordinate.longitude,
         status: "submitted",
@@ -251,8 +384,7 @@ export default function CreateReportScreen() {
       setDescription("");
       setCustomCategory("");
       setCategory("inspection");
-      setPhotoUri(null);
-      setPhotoBase64(null);
+      setPhotos([]);
     } catch (err: any) {
       const message = err?.response?.data?.message || "Laporan gagal dikirim";
       Alert.alert("Gagal", message);
@@ -343,57 +475,90 @@ export default function CreateReportScreen() {
 
         <Text style={styles.label}>Foto aktivitas</Text>
         <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-          <Text style={styles.imageButtonText}>{photoUri ? "Ambil ulang foto" : "Ambil foto"}</Text>
+          <Text style={styles.imageButtonText}>{photos.length ? "Ambil ulang foto" : "Ambil foto"}</Text>
         </TouchableOpacity>
-        {previewUri ? (
-          <TouchableOpacity onPress={() => setShowPhotoPreview(true)}>
-            <Image source={{ uri: previewUri }} style={styles.previewImage} />
-          </TouchableOpacity>
+
+        {/* Render all photos on the create page (no separate preview modal) */}
+        {photos.length > 0 ? (
+          photos.length === 1 ? (
+            (() => {
+              const p = photos[0];
+              const src = p.watermarkedBase64
+                ? `data:image/jpeg;base64,${p.watermarkedBase64}`
+                : p.uri
+                ? p.uri
+                : p.base64
+                ? `data:image/jpeg;base64,${p.base64}`
+                : undefined;
+              return src ? (
+                <Image
+                  source={{ uri: src }}
+                  style={[
+                    styles.fullWidthImage,
+                    imageAspectRatio ? { aspectRatio: imageAspectRatio } : { height: 380 },
+                  ]}
+                  resizeMode="contain"
+                />
+              ) : null;
+            })()
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+              {photos.map((p, idx) => {
+                const src = p.watermarkedBase64
+                  ? `data:image/jpeg;base64,${p.watermarkedBase64}`
+                  : p.uri
+                  ? p.uri
+                  : p.base64
+                  ? `data:image/jpeg;base64,${p.base64}`
+                  : undefined;
+                return src ? (
+                  <Image key={`${idx}-${p.uri || idx}`} source={{ uri: src }} style={styles.previewImage} />
+                ) : null;
+              })}
+            </ScrollView>
+          )
         ) : null}
 
-        <Modal visible={showPhotoPreview} animationType="slide" onRequestClose={() => setShowPhotoPreview(false)}>
-          <View style={styles.previewModal}>
-            {previewUri ? (
-              <Image source={{ uri: previewUri }} style={styles.fullImage} resizeMode="contain" />
-            ) : null}
-            <View style={styles.previewActions}>
-              <TouchableOpacity
-                style={[styles.imageButton, { flex: 1, marginRight: 8 }]}
-                onPress={() => {
-                  // retake: open camera
-                  setShowPhotoPreview(false);
-                  setTimeout(() => setShowCamera(true), 120);
-                }}
-              >
-                <Text style={styles.imageButtonText}>Ambil ulang foto</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.imageButton, { flex: 1, backgroundColor: "#10b981" }]}
-                onPress={() => setShowPhotoPreview(false)}
-              >
-                <Text style={styles.imageButtonText}>Gunakan foto</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+        {/* No full-screen preview modal anymore */}
 
         <Modal visible={showWatermarker} animationType="fade" onRequestClose={() => setShowWatermarker(false)}>
           <View style={{ flex: 1, backgroundColor: '#000' }}>
-            {photoBase64 ? (
+            {currentProcessingIndex !== null && photos[currentProcessingIndex]?.base64 ? (
               <ImageWatermarker
-                photoBase64={photoBase64}
+                photoBase64={photos[currentProcessingIndex]!.base64!}
                 heading={heading}
                 dateStr={new Date().toLocaleString('id-ID')}
-                address={addressParts}
+                address={watermarkAddressRef.current || watermarkAddress || addressParts}
                 onDone={(newBase64) => {
-                  setPhotoWatermarkedBase64(newBase64);
+                  // update the specific photo with watermarked base64
+                  setPhotos((prev) => {
+                    const next = [...prev];
+                    if (next[currentProcessingIndex!] ) {
+                      next[currentProcessingIndex!] = {
+                        ...next[currentProcessingIndex!],
+                        watermarkedBase64: newBase64,
+                      };
+                    }
+                    return next;
+                  });
                   setShowWatermarker(false);
-                  setShowPhotoPreview(true);
+                  setCurrentProcessingIndex(null);
                 }}
                 onError={(err) => {
                   console.warn('[watermarker] error', err);
+                  // fallback: keep original base64 as watermarked so UI shows image
+                  setPhotos((prev) => {
+                    const next = [...prev];
+                    if (next[currentProcessingIndex!]) {
+                      next[currentProcessingIndex!] = {
+                        ...next[currentProcessingIndex!],
+                        watermarkedBase64: next[currentProcessingIndex!].base64,
+                      };
+                    }
+                    return next;
+                  });
                   setShowWatermarker(false);
-                  setShowPhotoPreview(true);
+                  setCurrentProcessingIndex(null);
                 }}
               />
             ) : null}
@@ -414,16 +579,16 @@ export default function CreateReportScreen() {
 
         <View style={styles.mapContainer}>
           <Text style={styles.mapLabel}>
-            {photoUri ? "Lokasi dikunci setelah foto diambil" : "Pilih lokasi di peta"}
+            {photos.length ? "Lokasi dikunci setelah foto diambil" : "Pilih lokasi di peta"}
           </Text>
           <OpenStreetMapView
             style={styles.map}
             latitude={mapRegion.latitude}
             longitude={mapRegion.longitude}
             zoom={14}
-            interactive={!photoUri}
+            interactive={photos.length === 0}
             markerCoordinate={selectedCoordinate}
-            onCoordinateSelected={!photoUri ? (coordinate) => setSelectedCoordinate(coordinate) : undefined}
+            onCoordinateSelected={photos.length === 0 ? (coordinate) => setSelectedCoordinate(coordinate) : undefined}
           />
         </View>
 
@@ -672,10 +837,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   previewImage: {
-    width: "100%",
+    width: 240,
     height: 180,
     borderRadius: 12,
     marginBottom: 14,
+    marginRight: 12,
+  },
+  fullWidthImage: {
+    width: "100%",
+    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: '#000',
   },
   button: {
     backgroundColor: "#2563eb",

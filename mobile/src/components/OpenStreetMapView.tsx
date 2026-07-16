@@ -33,6 +33,8 @@ export default function OpenStreetMapView({
       ? `setMarker(${markerCoordinate.latitude}, ${markerCoordinate.longitude}); map.setView([${markerCoordinate.latitude}, ${markerCoordinate.longitude}], ${zoom});`
       : `setMarker(${latitude}, ${longitude});`;
 
+    const proxiedApiRoot = (process.env.EXPO_PUBLIC_API_URL || "https://mobile-monitoring-production.up.railway.app/api").replace(/\/api\/?$/, "");
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -67,8 +69,7 @@ export default function OpenStreetMapView({
     });
 
     // Use backend tile proxy by default to avoid volunteer OSM tile usage.
-    const apiRoot = (process.env.EXPO_PUBLIC_API_URL || "https://mobile-monitoring-production.up.railway.app/api").replace(/\/api\/?$/, "");
-    const tileUrl = `${apiRoot}/tiles/{z}/{x}/{y}.png`;
+    const tileUrl = "${proxiedApiRoot}/tiles/{z}/{x}/{y}.png";
     L.tileLayer(tileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,

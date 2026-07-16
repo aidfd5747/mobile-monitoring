@@ -104,6 +104,34 @@ const getOsmMapSources = (latitude: number, longitude: number, zoom = 15) => {
   };
 };
 
+// Build proxy URLs for the 3x3 tile grid returned by getOsmTileGrid
+const getProxyTileGrid = (latitude: number, longitude: number, zoom = 15) => {
+  const tileInfo = getOsmTileGrid(latitude, longitude, zoom);
+  const apiRoot = (process.env.EXPO_PUBLIC_API_URL || "https://mobile-monitoring-production.up.railway.app/api").replace(/\/api\/?$/, "");
+  const proxyBase = `${apiRoot}/tiles`;
+
+  // reconstruct urls corresponding to the 3x3 block used by getOsmTileGrid
+  const xBase = tileInfo.xTile - 1;
+  const yBase = tileInfo.yTile - 1;
+  const urls = [
+    `${proxyBase}/${zoom}/${xBase}/${yBase}.png`,
+    `${proxyBase}/${zoom}/${xBase + 1}/${yBase}.png`,
+    `${proxyBase}/${zoom}/${xBase + 2}/${yBase}.png`,
+    `${proxyBase}/${zoom}/${xBase}/${yBase + 1}.png`,
+    `${proxyBase}/${zoom}/${xBase + 1}/${yBase + 1}.png`,
+    `${proxyBase}/${zoom}/${xBase + 2}/${yBase + 1}.png`,
+    `${proxyBase}/${zoom}/${xBase}/${yBase + 2}.png`,
+    `${proxyBase}/${zoom}/${xBase + 1}/${yBase + 2}.png`,
+    `${proxyBase}/${zoom}/${xBase + 2}/${yBase + 2}.png`,
+  ];
+
+  return {
+    urls,
+    fractionX: tileInfo.fractionX,
+    fractionY: tileInfo.fractionY,
+  };
+};
+
 // Hitung hash sederhana dari string untuk nama file cache unik
 const hashString = (value: string) =>
   value.split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 0);
@@ -439,10 +467,10 @@ export default function PrintReportsScreen() {
           ) {
             // build centered map image by downloading 3x3 tiles, composing into SVG and embedding as data URL
             try {
-              const grid = getOsmTileGrid(report.latitude, report.longitude);
-              console.log("[print] map tile urls", grid.urls);
-              const tileBase64s = await downloadTilesAsBase64(grid.urls);
-              mapDataUrl = composeTilesToSvgDataUrl(tileBase64s, grid.fractionX, grid.fractionY);
+                const grid = getProxyTileGrid(report.latitude, report.longitude);
+                console.log("[print] map tile urls", grid.urls);
+                const tileBase64s = await downloadTilesAsBase64(grid.urls);
+                mapDataUrl = composeTilesToSvgDataUrl(tileBase64s, grid.fractionX, grid.fractionY);
               console.log("[print] composed map data url length", mapDataUrl?.length);
             } catch (err) {
               console.warn("[print] failed to compose map image", err);

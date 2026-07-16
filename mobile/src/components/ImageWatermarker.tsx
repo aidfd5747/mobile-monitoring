@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 
@@ -8,6 +8,8 @@ type AddressParts = {
   city?: string;
   state?: string;
   postcode?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 type Props = {
@@ -20,6 +22,7 @@ type Props = {
 };
 
 export default function ImageWatermarker({ photoBase64, heading = 0, dateStr, address, onDone, onError }: Props) {
+  console.log('[ImageWatermarker] props address:', address);
   const html = useMemo(() => {
     const addrLines = [address.road, address.suburb, address.city, address.state, address.postcode]
       .filter(Boolean)
@@ -27,10 +30,23 @@ export default function ImageWatermarker({ photoBase64, heading = 0, dateStr, ad
       .join(", ");
 
     // inject values safely by encoding
+    const escapeValue = (value: string) =>
+      value
+        .replace(/\\/g, "\\\\")
+        .replace(/\"/g, "\\\"")
+        .replace(/\r?\n/g, " ");
+
     const imgData = photoBase64.replace(/\n/g, "");
     const headingDeg = heading || 0;
-    const dateText = dateStr.replace(/"/g, "\\\"");
-    const addrText = addrLines.replace(/"/g, "\\\"");
+    const dateText = escapeValue(dateStr);
+    const addrText = escapeValue(addrLines);
+    const roadText = escapeValue(address.road || "");
+    const suburbText = escapeValue(address.suburb || "");
+    const cityText = escapeValue(address.city || "");
+    const stateText = escapeValue(address.state || "");
+    const postcodeText = escapeValue(address.postcode || "");
+    const latitudeValue = typeof address.latitude === 'number' ? address.latitude : 0;
+    const longitudeValue = typeof address.longitude === 'number' ? address.longitude : 0;
 
     return `
     <!doctype html>
@@ -45,6 +61,13 @@ export default function ImageWatermarker({ photoBase64, heading = 0, dateStr, ad
       <script>
         (function(){
           const img = new Image();
+          const roadText = "${roadText}";
+          const suburbText = "${suburbText}";
+          const cityText = "${cityText}";
+          const stateText = "${stateText}";
+          const postcodeText = "${postcodeText}";
+          const latitude = ${latitudeValue};
+          const longitude = ${longitudeValue};
           img.onload = () => {
             const canvas = document.getElementById('c');
             const ctx = canvas.getContext('2d');
@@ -55,71 +78,108 @@ export default function ImageWatermarker({ photoBase64, heading = 0, dateStr, ad
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
             // compass top-left
-            const cx = 60;
-            const cy = 60;
-            const radius = 36;
+            const cx = 140;
+            const cy = 140;
+            const radius = 112;
             ctx.save();
             // draw compass background
-            ctx.globalAlpha = 0.85;
-            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.globalAlpha = 0.95;
+            ctx.fillStyle = 'rgba(0,0,0,0.72)';
             ctx.beginPath();
-            ctx.arc(cx, cy, radius+6, 0, Math.PI*2);
+            ctx.arc(cx, cy, radius + 20, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1;
 
+            // draw outer ring
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2);
+            ctx.stroke();
+
             // draw circle
             ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // draw cardinal markers
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI*2);
+            ctx.moveTo(cx, cy - radius - 14);
+            ctx.lineTo(cx, cy - radius + 20);
+            ctx.moveTo(cx, cy + radius + 14);
+            ctx.lineTo(cx, cy + radius - 20);
+            ctx.moveTo(cx - radius - 14, cy);
+            ctx.lineTo(cx - radius + 20, cy);
+            ctx.moveTo(cx + radius + 14, cy);
+            ctx.lineTo(cx + radius - 20, cy);
             ctx.stroke();
 
             // draw needle (rotate by heading)
             ctx.translate(cx, cy);
             ctx.rotate(${headingDeg} * Math.PI / 180);
-            // needle
             ctx.fillStyle = '#e11d48';
             ctx.beginPath();
-            ctx.moveTo(0, -radius + 6);
-            ctx.lineTo(6, 0);
-            ctx.lineTo(0, 6);
-            ctx.lineTo(-6, 0);
+            ctx.moveTo(0, -radius + 20);
+            ctx.lineTo(18, 0);
+            ctx.lineTo(0, 18);
+            ctx.lineTo(-18, 0);
             ctx.closePath();
             ctx.fill();
             ctx.rotate(-${headingDeg} * Math.PI / 180);
             ctx.translate(-cx, -cy);
             ctx.restore();
 
-            // draw date and address bottom-right
-            const padding = 16;
-            const text = "${dateText} | ${addrText}";
-            ctx.font = '20px sans-serif';
-            ctx.textBaseline = 'bottom';
-            const lines = [];
-            // wrap text
-            const words = text.split(' ');
-            let line = '';
-            for (let i=0;i<words.length;i++){
-              const testLine = line + (line ? ' ' : '') + words[i];
-              const w = ctx.measureText(testLine).width;
-              if (w > canvas.width - padding*2) {
-                lines.push(line);
-                line = words[i];
-              } else {
-                line = testLine;
+            // top-right watermark panel with location details
+            try {
+              ctx.save();
+              const titleText = 'Lokasi';
+              const labelFont = Math.max(16, Math.floor(canvas.width / 28));
+              const valueFont = Math.max(20, Math.floor(canvas.width / 24));
+              const padding2 = 16;
+              const gutter = 10;
+              const coordText = (latitude && longitude)
+                ? 'Koordinat ' + latitude.toFixed(5) + ', ' + longitude.toFixed(5)
+                : 'Koordinat tidak tersedia';
+              const lines = [
+                roadText || 'Jalan tidak tersedia',
+                suburbText ? 'Kecamatan ' + suburbText : 'Kecamatan tidak tersedia',
+                cityText ? 'Kota ' + cityText : 'Kota tidak tersedia',
+                stateText ? 'Provinsi ' + stateText : 'Provinsi tidak tersedia',
+                postcodeText ? 'Kode pos ' + postcodeText : coordText,
+                'Waktu: ${dateText}',
+              ];
+              ctx.font = 'bold ' + valueFont + 'px sans-serif';
+              let maxTextW = ctx.measureText(titleText).width;
+              ctx.font = labelFont + 'px sans-serif';
+              for (let i = 0; i < lines.length; i++) {
+                maxTextW = Math.max(maxTextW, ctx.measureText(lines[i]).width);
               }
-            }
-            if (line) lines.push(line);
+              const rectW2 = Math.min(maxTextW + padding2 * 2, canvas.width * 0.75);
+              const rectH2 = valueFont + padding2 + lines.length * (labelFont + 6);
+              const rectX = canvas.width - padding2 - rectW2;
+              const rectY = canvas.height - padding2 - rectH2;
 
-            const textHeight = 24 * lines.length + 12;
-            const rectW = canvas.width;
-            const rectH = textHeight + padding;
-            // background rectangle
-            ctx.fillStyle = 'rgba(0,0,0,0.55)';
-            ctx.fillRect(0, canvas.height - rectH, rectW, rectH);
-            ctx.fillStyle = '#fff';
-            for (let i=0;i<lines.length;i++){
-              ctx.fillText(lines[i], padding, canvas.height - padding - (lines.length - 1 - i)*24);
+              // remove solid panel background to keep the photo visible
+              ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(rectX, rectY, rectW2, rectH2);
+
+              ctx.fillStyle = 'rgba(255,255,255,0.98)';
+              ctx.font = 'bold ' + valueFont + 'px sans-serif';
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'top';
+              ctx.fillText(titleText, rectX + padding2, rectY + padding2);
+
+              ctx.font = labelFont + 'px sans-serif';
+              for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], rectX + padding2, rectY + padding2 + valueFont + gutter + i * (labelFont + 6));
+              }
+              ctx.restore();
+            } catch (e) {
+              // ignore if font drawing fails
             }
 
             // export
@@ -134,28 +194,59 @@ export default function ImageWatermarker({ photoBase64, heading = 0, dateStr, ad
     </html>
     `;
   }, [photoBase64, heading, dateStr, address]);
+  const webviewRef = useRef<any>(null);
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    doneRef.current = false;
+    const t = setTimeout(() => {
+      if (!doneRef.current) {
+        onError && onError(new Error('watermark-timeout'));
+      }
+    }, 12000);
+    return () => clearTimeout(t);
+  }, [photoBase64]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
+      console.log('[ImageWatermarker] webview message received', data?.slice?.(0, 120));
       if (data && data.startsWith('data:image')) {
         // strip header
         const base64 = data.split(',')[1];
+        doneRef.current = true;
         onDone(base64);
       } else {
         const parsed = JSON.parse(data);
         if (parsed?.error) {
+          doneRef.current = true;
           onError && onError(parsed.error);
         }
       }
     } catch (err) {
+      doneRef.current = true;
       onError && onError(err);
     }
   };
 
   return (
     <View style={styles.container}>
-      <WebView originWhitelist={["*"]} source={{ html }} onMessage={handleMessage} style={styles.webview} />
+      <WebView
+        ref={webviewRef}
+        originWhitelist={["*"]}
+        source={{ html }}
+        onMessage={handleMessage}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        allowFileAccess={true}
+        mixedContentMode="always"
+        onError={(e) => {
+          console.warn('[ImageWatermarker] webview error', e);
+          doneRef.current = true;
+          onError && onError(e);
+        }}
+        style={styles.webview}
+      />
       <View style={styles.loadingOverlay}>
         <ActivityIndicator size="large" color="#fff" />
       </View>
