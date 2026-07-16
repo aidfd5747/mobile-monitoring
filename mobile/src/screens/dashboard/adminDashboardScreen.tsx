@@ -101,7 +101,7 @@ export default function AdminDashboardScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.hero}>
         <Text style={styles.title}>Dashboard Admin</Text>
-        <Text style={styles.subtitle}>Monitor semua laporan lapangan secara realtime.</Text>
+        <Text style={styles.subtitle}>Monitor Semua Laporan Secara Real Time.</Text>
       </View>
 
       <View style={styles.grid}>
@@ -130,11 +130,11 @@ export default function AdminDashboardScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemName}>{item.petugasName || "Petugas"}</Text>
                   <Text style={styles.itemDesc}>{item.description || "-"}</Text>
-                  <Text style={styles.itemMeta}>{item.status || "submitted"}</Text>
+                  <Text style={styles.itemMeta}>{item.status === "submitted" ? "Menunggu" : "Selesai"}</Text>
                 </View>
                 {isAdmin ? (
                   <TouchableOpacity style={styles.actionButton} onPress={() => openReportDetail(item)}>
-                    <Text style={styles.actionText}>Inspect</Text>
+                    <Text style={styles.actionText}>Verifikasi</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   itemMeta: {
-    color: "#16a34a",
+    color: "red",
     marginTop: 4,
     fontSize: 12,
   },

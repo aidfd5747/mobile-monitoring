@@ -134,7 +134,8 @@ export default function ReportHistoryScreen() {
             <View style={styles.cardTop}>
               <Text style={styles.cardTitle}>{item.petugasName || "Petugas"}</Text>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.status || "submitted"}</Text>
+                <Text style={[styles.badge, item.status === "completed" ? styles.completed : styles.submitted]}>
+                          {item.status === "completed" ? "Selesai" : "Menunggu"}</Text>
               </View>
             </View>
             <Text style={styles.cardMeta}>{item.categoryName || "Kategori"}</Text>
@@ -304,4 +305,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
   },
-});
+   completed: {
+    color: "#16a34a",
+    fontWeight: "700",
+  },
+  submitted: {
+    color: "#dc2626",
+    fontWeight: "700",
+}});

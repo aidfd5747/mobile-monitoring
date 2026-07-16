@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   },
   role: {
     fontSize: 14,
-    color: "#2563eb",
+    color: "blue",
     marginBottom: 2,
     fontWeight: "600",
   },

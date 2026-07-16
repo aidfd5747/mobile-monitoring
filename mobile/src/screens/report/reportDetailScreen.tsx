@@ -139,7 +139,7 @@ export default function ReportDetailScreen() {
 
         <Text style={styles.label}>Status</Text>
         <Text style={[styles.value, report.status === "completed" ? styles.completed : styles.submitted]}>
-          {report.status === "completed" ? "Completed" : "Submitted"}
+          {report.status === "completed" ? "Selesai" : "Menunggu"}
         </Text>
 
         <Text style={styles.label}>Waktu Dibuat</Text>
