@@ -127,6 +127,32 @@ export class AuthController {
     }
   }
 
+  static async savePushToken(req: AuthenticatedRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const expoPushToken = getStringValue(req.body.expoPushToken);
+
+      if (!userId) {
+        return res.status(401).json({ message: "Token tidak valid" });
+      }
+
+      if (!expoPushToken) {
+        return res.status(400).json({ message: "expoPushToken wajib diisi" });
+      }
+
+      const savedToken = await AuthService.savePushToken({
+        userId,
+        role: req.user?.role,
+        expoPushToken,
+      });
+
+      return res.json({ message: "Token push berhasil disimpan", token: savedToken });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Gagal menyimpan token push" });
+    }
+  }
+
   static async login(
     req: Request,
     res: Response

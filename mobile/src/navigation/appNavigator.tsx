@@ -8,6 +8,7 @@ import LoadingScreen from "../screens/loadingScreen";
 import MainTabs from "./mainTabs";
 import ReportDetailScreen from "../screens/report/reportDetailScreen";
 import CreateUserScreen from "../screens/admin/createUserScreen";
+import CreateReportScreen from "../screens/report/createReportScreen";
 
 // appNavigator.tsx
 // Navigasi utama aplikasi yang menampilkan layar login atau tab utama.
@@ -60,6 +61,13 @@ export default function AppNavigator() {
               component={CreateUserScreen}
               options={{
                 title: "Buat Petugas",
+              }}
+            />
+            <Stack.Screen
+              name="CreateReport"
+              component={CreateReportScreen}
+              options={{
+                title: "Buat Laporan",
               }}
             />
             <Stack.Screen

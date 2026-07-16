@@ -17,6 +17,12 @@ interface SummaryData {
   }>;
 }
 
+interface NotificationItem {
+  id: string;
+  message: string;
+  createdAt?: string;
+}
+
 // Layar dashboard khusus admin untuk monitoring laporan dan ringkasan statistik
 export default function AdminDashboardScreen() {
   // Data pengguna dan navigasi untuk membuka detail laporan
@@ -24,6 +30,7 @@ export default function AdminDashboardScreen() {
   const navigation = useNavigation<any>();
   // Ringkasan statistik laporan dari backend
   const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   // Status loading saat memuat data summary
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === "admin";
@@ -50,13 +57,29 @@ export default function AdminDashboardScreen() {
     }
   };
 
+  const loadNotifications = async () => {
+    try {
+      const response = await api.get("/reports/notifications");
+      const nextNotifications = response.data.notifications ?? [];
+      setNotifications(nextNotifications);
+
+      if (nextNotifications.length) {
+        Alert.alert("Notifikasi", nextNotifications[0].message);
+      }
+    } catch (error) {
+      setNotifications([]);
+    }
+  };
+
   useEffect(() => {
     loadSummary();
+    loadNotifications();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadSummary();
+      loadNotifications();
       return () => undefined;
     }, [])
   );
@@ -119,6 +142,22 @@ export default function AdminDashboardScreen() {
           ))
         ) : (
           <Text style={styles.empty}>Belum ada laporan.</Text>
+        )}
+      </View>
+
+      <View style={styles.notificationPanel}>
+        <Text style={styles.panelTitle}>Notifikasi</Text>
+        {notifications.length ? (
+          notifications.slice(0, 3).map((item) => (
+            <View key={item.id} style={styles.notificationItem}>
+              <Text style={styles.notificationMessage}>{item.message}</Text>
+              <Text style={styles.notificationMeta}>
+                {item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "Baru"}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.empty}>Belum ada notifikasi.</Text>
         )}
       </View>
     </ScrollView>
@@ -186,6 +225,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
+  notificationPanel: {
+    marginTop: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
   panelTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -227,6 +274,20 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontWeight: "700",
     fontSize: 12,
+  },
+  notificationItem: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+  notificationMessage: {
+    color: "#0f172a",
+    fontSize: 13,
+  },
+  notificationMeta: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 4,
   },
   empty: {
     color: "#64748b",

@@ -2,12 +2,12 @@ export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
   CreateUser: undefined;
+  CreateReport: { autoCamera?: boolean } | undefined;
   ReportDetail: { report?: any; reportId?: string } | undefined;
 };
 
 export type MainTabParamList = {
   Dashboard: undefined;
-  CreateReport: undefined;
   ReportHistory: undefined;
   Profile: undefined;
   Workers: undefined;

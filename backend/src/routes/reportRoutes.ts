@@ -8,6 +8,8 @@ const router = Router();
 
 // Buat laporan baru.
 router.post("/", authMiddleware, ReportController.create);
+// Ambil daftar notifikasi user.
+router.get("/notifications", authMiddleware, ReportController.notifications);
 // Ambil daftar laporan.
 router.get("/", authMiddleware, ReportController.list);
 // Hapus laporan berdasarkan ID (admin saja).

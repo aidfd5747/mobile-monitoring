@@ -36,6 +36,13 @@ router.get(
   AuthController.getProfile
 );
 
+// Simpan token push Expo perangkat user untuk notifikasi real-time.
+router.post(
+  "/push-token",
+  authMiddleware,
+  AuthController.savePushToken
+);
+
 // Perbarui username atau password user yang sedang login.
 router.patch(
   "/profile",

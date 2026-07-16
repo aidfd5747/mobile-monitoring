@@ -18,6 +18,23 @@ interface FirestoreReport {
   createdAt?: string;
 }
 
+interface FirestoreNotification {
+  id: string;
+  recipientId?: string;
+  recipientRole?: string;
+  message: string;
+  reportId?: string;
+  createdAt?: string;
+}
+
+interface FirestorePushToken {
+  id: string;
+  userId?: string;
+  role?: string;
+  expoPushToken?: string;
+  createdAt?: string;
+}
+
 export interface ReportPayload {
   petugasId: string;
   petugasName?: string;
@@ -38,6 +55,69 @@ const supabase = createClient(
 );
 
 export class ReportService {
+  static async sendExpoPushNotifications(tokens: string[], title: string, body: string) {
+    if (!tokens.length) {
+      return;
+    }
+
+    const notificationPayload = {
+      to: tokens,
+      sound: "default",
+      title,
+      body,
+      data: {
+        type: "report-update",
+      },
+    };
+
+    try {
+      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(notificationPayload),
+      });
+
+      const result = await response.json();
+      console.log("[backend] expo push response", result);
+    } catch (error) {
+      console.error("[backend] expo push failed", error);
+    }
+  }
+
+  static async getPushTokensByRole(role?: string) {
+    const snapshot = await firestore.collection("pushTokens").get();
+
+    return snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as FirestorePushToken))
+      .filter((item) => item.role === role)
+      .map((item) => String(item.expoPushToken ?? ""))
+      .filter(Boolean);
+  }
+
+  static async getPushTokensByUserId(userId?: string) {
+    if (!userId) {
+      return [];
+    }
+
+    const snapshot = await firestore.collection("pushTokens")
+      .where("userId", "==", userId)
+      .get();
+
+    return snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as FirestorePushToken))
+      .map((item) => String(item.expoPushToken ?? ""))
+      .filter(Boolean);
+  }
+
   // Buat laporan baru: unggah foto ke Supabase jika ada, lalu simpan ke Firestore.
   static async createReport(payload: ReportPayload) {
     const { photoBase64, photoName, photoUrl: unusedPhotoUrl, ...rest } = payload;
@@ -83,6 +163,20 @@ export class ReportService {
 
     const snapshot = await docRef.get();
     console.log("[backend] report created in firestore", { reportId: docRef.id, status: rest.status || "submitted" });
+
+    await this.createNotification({
+      recipientRole: "admin",
+      message: `${rest.petugasName || "Petugas"} membuat laporan baru`,
+      reportId: docRef.id,
+      type: "report_created",
+    });
+
+    const adminPushTokens = await this.getPushTokensByRole("admin");
+    await this.sendExpoPushNotifications(
+      adminPushTokens,
+      "Laporan baru",
+      `${rest.petugasName || "Petugas"} membuat laporan baru`
+    );
 
     return {
       id: docRef.id,
@@ -132,6 +226,54 @@ export class ReportService {
     ];
   }
 
+  // Simpan notifikasi baru ke Firestore.
+  static async createNotification(payload: {
+    recipientId?: string;
+    recipientRole?: string;
+    message: string;
+    reportId?: string;
+    type?: string;
+  }) {
+    const docRef = await firestore.collection("notifications").add({
+      ...payload,
+      createdAt: new Date().toISOString(),
+    });
+
+    const snapshot = await docRef.get();
+    return {
+      id: docRef.id,
+      ...snapshot.data(),
+    } as FirestoreNotification;
+  }
+
+  // Ambil notifikasi pengguna berdasarkan role atau ID petugas.
+  static async getNotifications(user?: { id?: string; role?: string }) {
+    const snapshot = await firestore.collection("notifications").get();
+
+    const notifications = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as FirestoreNotification))
+      .sort((a, b) => {
+        const dateA = a.createdAt ? String(a.createdAt) : "";
+        const dateB = b.createdAt ? String(b.createdAt) : "";
+        return dateB.localeCompare(dateA);
+      });
+
+    if (!user) {
+      return notifications;
+    }
+
+    return notifications.filter((item) => {
+      if (user.role === "admin") {
+        return item.recipientRole === "admin";
+      }
+
+      return item.recipientId === user.id || item.recipientRole === user.role;
+    });
+  }
+
   // Hapus laporan berdasarkan ID.
   static async deleteReport(id: string) {
     console.log("[backend] deleting report", { reportId: id });
@@ -166,10 +308,26 @@ export class ReportService {
     });
 
     const updatedSnapshot = await docRef.get();
+    const updatedData = updatedSnapshot.data();
+
+    await this.createNotification({
+      recipientId: updatedData?.petugasId,
+      recipientRole: "worker",
+      message: `Status laporan Anda telah diperbarui menjadi ${status}`,
+      reportId: id,
+      type: "report_status_updated",
+    });
+
+    const workerPushTokens = await this.getPushTokensByUserId(updatedData?.petugasId);
+    await this.sendExpoPushNotifications(
+      workerPushTokens,
+      "Status laporan diperbarui",
+      `Status laporan Anda telah diperbarui menjadi ${status}`
+    );
 
     return {
       id: docRef.id,
-      ...updatedSnapshot.data(),
+      ...updatedData,
     };
   }
 }

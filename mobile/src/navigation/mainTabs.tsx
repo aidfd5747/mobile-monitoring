@@ -7,9 +7,6 @@ import DashboardScreen
   from "../screens/dashboard/dashboardScreen";
 import AdminDashboardScreen from "../screens/dashboard/adminDashboardScreen";
 
-import CreateReportScreen
-  from "../screens/report/createReportScreen";
-
 import ReportHistoryScreen
   from "../screens/report/reportHistoryScreen";
 import PrintReportsScreen from "../screens/report/printReportsScreen";
@@ -67,8 +64,6 @@ export default function MainTabs() {
 
           if (route.name === "Dashboard") {
             iconName = focused ? "home" : "home-outline";
-          } else if (route.name === "CreateReport") {
-            iconName = focused ? "add-circle" : "add-circle-outline";
           } else if (route.name === "ReportHistory") {
             iconName = focused ? "list" : "list-outline";
           } else if (route.name === "Workers") {
@@ -89,15 +84,7 @@ export default function MainTabs() {
         component={isAdmin ? AdminDashboardScreen : DashboardScreen}
       />
 
-      {!isAdmin ? (
-        <Tab.Screen
-          name="CreateReport"
-          component={CreateReportScreen}
-          options={{
-            title: "Laporan",
-          }}
-        />
-      ) : (
+      {!isAdmin ? null : (
         <>
           <Tab.Screen
             name="ReportHistory"

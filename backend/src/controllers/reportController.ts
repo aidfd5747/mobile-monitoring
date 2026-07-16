@@ -45,6 +45,18 @@ export class ReportController {
     }
   }
 
+  // Ambil daftar notifikasi untuk user yang sedang login.
+  static async notifications(req: Request, res: Response) {
+    try {
+      const authUser = (req as any).user;
+      const notifications = await ReportService.getNotifications(authUser);
+      return res.json({ notifications });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Gagal mengambil notifikasi" });
+    }
+  }
+
   // Hapus laporan dengan ID tertentu (hanya admin).
   static async delete(req: Request, res: Response) {
     try {

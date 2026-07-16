@@ -62,6 +62,33 @@ export class AuthService {
     await docRef.delete();
   }
 
+  // Simpan token push perangkat untuk user tertentu.
+  static async savePushToken(payload: { userId: string; role?: string; expoPushToken: string }) {
+    const existingSnapshot = await firestore.collection("pushTokens")
+      .where("userId", "==", payload.userId)
+      .where("expoPushToken", "==", payload.expoPushToken)
+      .limit(1)
+      .get();
+
+    if (!existingSnapshot.empty) {
+      const existingDoc = existingSnapshot.docs[0];
+      return { id: existingDoc.id, ...existingDoc.data() };
+    }
+
+    const docRef = await firestore.collection("pushTokens").add({
+      userId: payload.userId,
+      role: payload.role,
+      expoPushToken: payload.expoPushToken,
+      createdAt: new Date().toISOString(),
+    });
+
+    const snapshot = await docRef.get();
+    return {
+      id: docRef.id,
+      ...snapshot.data(),
+    };
+  }
+
   // Perbarui username atau password user.
   static async updateUser(id: string, payload: { username?: string; password?: string }) {
     const updatePayload: Record<string, any> = {};

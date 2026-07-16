@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useContext, useRef, useState, useEffect } from "react";
-import * as ImagePicker from "expo-image-picker";
+import { useRoute } from "@react-navigation/native";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
 import api from "../../services/api";
@@ -18,6 +19,7 @@ import OpenStreetMapView from "../../components/OpenStreetMapView";
 
 // Halaman untuk membuat laporan baru dengan foto, kategori, dan lokasi GPS
 export default function CreateReportScreen() {
+  const route = useRoute<any>();
   // Data pengguna yang membuat laporan
   const { user } = useContext(AuthContext);
   // Lokasi saat ini dari hook custom useLocation
@@ -31,12 +33,15 @@ export default function CreateReportScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
   const [mapRegion, setMapRegion] = useState({
     latitude: -6.200000,
     longitude: 106.816666,
     latitudeDelta: 0.04,
     longitudeDelta: 0.04,
   });
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const scrollToBottom = () => {
@@ -69,73 +74,63 @@ export default function CreateReportScreen() {
     }
   }, [selectedCoordinate]);
 
-  // Pilih foto dari kamera atau galeri, lalu simpan sebagai base64
+  useEffect(() => {
+    if (!route.params?.autoCamera || photoUri) {
+      return;
+    }
+
+    const openCameraImmediately = async () => {
+      if (!cameraPermission?.granted) {
+        const requested = await requestCameraPermission();
+        if (!requested.granted) {
+          Alert.alert("Izin dibutuhkan", "Izinkan akses kamera untuk mengambil foto");
+          return;
+        }
+      }
+
+      setShowCamera(true);
+    };
+
+    openCameraImmediately();
+  }, [route.params?.autoCamera, photoUri, cameraPermission?.granted, requestCameraPermission]);
+
+  const takePhoto = async () => {
+    if (!cameraPermission?.granted) {
+      const requested = await requestCameraPermission();
+      if (!requested.granted) {
+        Alert.alert("Izin dibutuhkan", "Izinkan akses kamera untuk mengambil foto");
+        return;
+      }
+    }
+
+    const result = await cameraRef.current?.takePictureAsync({
+      quality: 0.8,
+      base64: true,
+      skipProcessing: true,
+    });
+
+    if (!result?.uri || !result.base64) {
+      Alert.alert("Gagal", "Foto tidak bisa dibaca");
+      return;
+    }
+
+    setPhotoUri(result.uri);
+    setPhotoBase64(result.base64);
+    setShowCamera(false);
+    scrollToBottom();
+  };
+
+  // Ambil foto melalui kamera dan simpan sebagai base64
   const pickImage = async () => {
-    Alert.alert("Pilih sumber foto", "Ambil foto langsung dari kamera atau pilih dari galeri", [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Kamera",
-        onPress: async () => {
-          const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-          if (!cameraPermission.granted) {
-            Alert.alert("Izin dibutuhkan", "Izinkan akses kamera untuk mengambil foto");
-            return;
-          }
+    if (!cameraPermission?.granted) {
+      const requested = await requestCameraPermission();
+      if (!requested.granted) {
+        Alert.alert("Izin dibutuhkan", "Izinkan akses kamera untuk mengambil foto");
+        return;
+      }
+    }
 
-          const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            quality: 0.8,
-            base64: true,
-          });
-
-          if (result.canceled) {
-            return;
-          }
-
-          const asset = result.assets?.[0];
-          if (!asset?.uri || !asset.base64) {
-            Alert.alert("Gagal", "Foto tidak bisa dibaca");
-            return;
-          }
-
-          setPhotoUri(asset.uri);
-          setPhotoBase64(asset.base64);
-          scrollToBottom();
-        },
-      },
-      {
-        text: "Galeri",
-        onPress: async () => {
-          const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!mediaPermission.granted) {
-            Alert.alert("Izin dibutuhkan", "Izinkan akses galeri untuk memilih foto");
-            return;
-          }
-
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.8,
-            base64: true,
-            selectionLimit: 1,
-          });
-
-          if (result.canceled) {
-            return;
-          }
-
-          const asset = result.assets?.[0];
-          if (!asset?.uri || !asset.base64) {
-            Alert.alert("Gagal", "Foto tidak bisa dibaca");
-            return;
-          }
-
-          setPhotoUri(asset.uri);
-          setPhotoBase64(asset.base64);
-          scrollToBottom();
-        },
-      },
-    ]);
+    setShowCamera(true);
   };
 
   // Kirim data laporan ke backend setelah validasi input
@@ -193,6 +188,54 @@ export default function CreateReportScreen() {
     }
   };
 
+  if (showCamera) {
+    return (
+      <View style={styles.cameraScreen}>
+        <CameraView
+          ref={cameraRef}
+          style={styles.cameraView}
+          facing="back"
+        >
+          <View style={styles.frameOverlay} />
+
+          <View style={styles.overlayTopLeft}>
+            <Text style={styles.overlayCompass}>N</Text>
+            <Text style={styles.overlayCompassLabel}>Compass</Text>
+          </View>
+
+          <View style={styles.overlayBottomLeft}>
+            <View style={styles.mapBadge}>
+              <View style={styles.mapIconWrap}>
+                <Text style={styles.mapBadgeIcon}>⌖</Text>
+              </View>
+              <View>
+                <Text style={styles.mapBadgeTitle}>Map</Text>
+                <Text style={styles.mapBadgeText}>
+                  {selectedCoordinate
+                    ? `${selectedCoordinate.latitude.toFixed(4)}, ${selectedCoordinate.longitude.toFixed(4)}`
+                    : "Lokasi aktif"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.overlayBottomRight}>
+            <Text style={styles.watermarkText}>MOBILE MONITORING</Text>
+          </View>
+
+          <View style={styles.cameraCaptureBar}>
+            <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
+              <View style={styles.captureInner} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCamera(false)}>
+              <Text style={styles.cancelButtonText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </CameraView>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       ref={scrollViewRef}
@@ -227,7 +270,7 @@ export default function CreateReportScreen() {
 
         <Text style={styles.label}>Foto aktivitas</Text>
         <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-          <Text style={styles.imageButtonText}>{photoUri ? "Ganti foto" : "Pilih foto"}</Text>
+          <Text style={styles.imageButtonText}>{photoUri ? "Ambil ulang foto" : "Ambil foto"}</Text>
         </TouchableOpacity>
         {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
 
@@ -347,15 +390,156 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  cameraScreen: {
+    flex: 1,
+    backgroundColor: "#020617",
+  },
+  cameraView: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  frameOverlay: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    bottom: 12,
+    left: 12,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.45)",
+    zIndex: 1,
+  },
+  overlayTopLeft: {
+    position: "absolute",
+    top: 26,
+    left: 20,
+    zIndex: 2,
+    backgroundColor: "rgba(15, 23, 42, 0.62)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    minWidth: 72,
+  },
+  overlayCompass: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 20,
+    lineHeight: 20,
+  },
+  overlayCompassLabel: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 9,
+    marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  overlayBottomLeft: {
+    position: "absolute",
+    bottom: 96,
+    left: 18,
+    zIndex: 2,
+  },
+  mapBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 8,
+    minWidth: 172,
+  },
+  mapIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapBadgeIcon: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  mapBadgeTitle: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  mapBadgeText: {
+    color: "#ffffff",
+    fontSize: 10,
+    marginTop: 1,
+  },
+  overlayBottomRight: {
+    position: "absolute",
+    right: 20,
+    bottom: 96,
+    zIndex: 2,
+    backgroundColor: "rgba(15, 23, 42, 0.52)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  watermarkText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  cameraCaptureBar: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  captureButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "rgba(37, 99, 235, 0.5)",
+  },
+  captureInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#2563eb",
+  },
+  cancelButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  cancelButtonText: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
   imageButton: {
-    backgroundColor: "#e0e7ff",
+    backgroundColor: "#2563eb",
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
     marginBottom: 12,
   },
   imageButtonText: {
-    color: "#3730a3",
+    color: "#ffffff",
     fontWeight: "700",
   },
   previewImage: {
