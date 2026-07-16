@@ -84,10 +84,12 @@ const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
   };
 };
 
-// Ambil URL tile pusat OSM sebagai fallback untuk caching
+// Ambil URL gambar peta statis yang sudah diformat dengan marker di tengah
+// Menggunakan layanan staticmap.openstreetmap.de untuk menghasilkan
+// PNG terpusat pada koordinat dan zoom yang diinginkan.
 const getOsmTileUrl = (latitude: number, longitude: number, zoom = 15) => {
-  const tileInfo = getOsmTileGrid(latitude, longitude, zoom);
-  return { url: tileInfo.urls[4] };
+  const url = `https://staticmap.openstreetmap.de/staticmap.php?center=${latitude},${longitude}&zoom=${zoom}&size=160x120&markers=${latitude},${longitude},red-pushpin`;
+  return { url };
 };
 
 // Hitung hash sederhana dari string untuk nama file cache unik
@@ -101,36 +103,44 @@ const getMapCacheUri = (url: string) => {
   return `${cacheDir}${fileName}`;
 };
 
-// Download tile peta jika belum ada di cache, lalu kembalikan URI lokalnya
+// Konversi ArrayBuffer ke base64
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  if (typeof btoa !== "undefined") {
+    return btoa(binary);
+  }
+  // Fallback: use Buffer if tersedia
+  // @ts-ignore
+  if (typeof Buffer !== "undefined") return Buffer.from(binary, "binary").toString("base64");
+  throw new Error("No base64 conversion available");
+};
+
+// Download gambar peta (static map) sebagai base64 dan simpan ke cache lokal
 const cacheMapFile = async (url: string): Promise<string | undefined> => {
   try {
     const fileUri = getMapCacheUri(url);
-    console.log("[print] cache directories", {
-      cacheDirectory: FileSystem.cacheDirectory,
-      documentDirectory: FileSystem.documentDirectory,
-      fileUri,
-    });
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
-    console.log("[print] cache file info", { exists: fileInfo.exists, uri: fileInfo.uri });
-    if (fileInfo.exists) {
-      console.log("[print] map cache hit", fileUri);
-      return fileUri;
+    if (fileInfo.exists) return fileUri;
+
+    console.log("[print] fetching static map", url);
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn("[print] static map fetch failed", response.status, response.statusText);
+      return undefined;
     }
 
-    console.log("[print] downloading map tile", url);
-    const downloadResult = await FileSystem.downloadAsync(url, fileUri);
-    console.log("[print] download result", downloadResult);
-    if (downloadResult.status !== 200) {
-      throw new Error(`tile download failed with status ${downloadResult.status}`);
-    }
-
-    const downloadedFileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
-    if (!downloadedFileInfo.exists || downloadedFileInfo.size === 0) {
-      throw new Error("tile download returned empty file");
-    }
-
-    console.log("[print] map cached", downloadResult.uri);
-    return downloadResult.uri;
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = arrayBufferToBase64(arrayBuffer);
+    await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+    const saved = await FileSystem.getInfoAsync(fileUri);
+    if (!saved.exists) throw new Error("failed to write cached map file");
+    console.log("[print] static map cached", fileUri);
+    return fileUri;
   } catch (error) {
     console.warn("[print] failed to cache map image", error, url);
     return undefined;

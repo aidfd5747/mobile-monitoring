@@ -8,14 +8,17 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useContext, useRef, useState, useEffect } from "react";
+import * as Location from "expo-location";
 import { useRoute } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
 import api from "../../services/api";
 import OpenStreetMapView from "../../components/OpenStreetMapView";
+import ImageWatermarker from "../../components/ImageWatermarker";
 
 // Halaman untuk membuat laporan baru dengan foto, kategori, dan lokasi GPS
 export default function CreateReportScreen() {
@@ -32,6 +35,9 @@ export default function CreateReportScreen() {
   const [loading, setLoading] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [heading, setHeading] = useState<number>(0);
+  const [showWatermarker, setShowWatermarker] = useState(false);
+  const [addressParts, setAddressParts] = useState<any>({});
   const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [mapRegion, setMapRegion] = useState({
@@ -94,6 +100,35 @@ export default function CreateReportScreen() {
     openCameraImmediately();
   }, [route.params?.autoCamera, photoUri, cameraPermission?.granted, requestCameraPermission]);
 
+  // watch device heading while camera is open to use for compass needle
+  useEffect(() => {
+    let sub: any = null;
+    let isActive = true;
+    if (showCamera) {
+      (async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') return;
+          sub = await Location.watchHeadingAsync((heading) => {
+            if (!isActive) return;
+            if (heading && typeof heading.trueHeading === 'number') {
+              setHeading(heading.trueHeading);
+            } else if (heading && typeof heading.magHeading === 'number') {
+              setHeading(heading.magHeading);
+            }
+          });
+        } catch (err) {
+          // ignore
+        }
+      })();
+    }
+
+    return () => {
+      isActive = false;
+      if (sub && typeof sub.remove === 'function') sub.remove();
+    };
+  }, [showCamera]);
+
   const takePhoto = async () => {
     if (!cameraPermission?.granted) {
       const requested = await requestCameraPermission();
@@ -116,8 +151,39 @@ export default function CreateReportScreen() {
 
     setPhotoUri(result.uri);
     setPhotoBase64(result.base64);
-    setShowCamera(false);
-    scrollToBottom();
+    // perform reverse geocoding and watermarking then show preview
+    try {
+      const lat = selectedCoordinate?.latitude ?? location?.coords.latitude;
+      const lon = selectedCoordinate?.longitude ?? location?.coords.longitude;
+      if (lat && lon) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+          );
+          if (res.ok) {
+            const json = await res.json();
+            const addr = json.address || {};
+            setAddressParts({
+              road: addr.road || addr.pedestrian || addr.footway || addr.cycleway || '',
+              suburb: addr.suburb || addr.village || addr.hamlet || '',
+              city: addr.city || addr.town || addr.municipality || addr.county || '',
+              state: addr.state || '',
+              postcode: addr.postcode || '',
+            });
+          }
+        } catch (err) {
+          console.warn('[report] reverse geocode failed', err);
+        }
+      }
+
+      setShowCamera(false);
+      setShowWatermarker(true);
+      scrollToBottom();
+    } catch (err) {
+      setShowCamera(false);
+      setShowPhotoPreview(true);
+      scrollToBottom();
+    }
   };
 
   // Ambil foto melalui kamera dan simpan sebagai base64
@@ -132,6 +198,9 @@ export default function CreateReportScreen() {
 
     setShowCamera(true);
   };
+
+  // Local state to show full-screen photo preview
+  const [showPhotoPreview, setShowPhotoPreview] = useState(false);
 
   // Kirim data laporan ke backend setelah validasi input
   const handleSubmit = async () => {
@@ -272,7 +341,62 @@ export default function CreateReportScreen() {
         <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
           <Text style={styles.imageButtonText}>{photoUri ? "Ambil ulang foto" : "Ambil foto"}</Text>
         </TouchableOpacity>
-        {photoUri ? <Image source={{ uri: photoUri }} style={styles.previewImage} /> : null}
+        {photoUri ? (
+          <TouchableOpacity onPress={() => setShowPhotoPreview(true)}>
+            <Image source={{ uri: photoUri }} style={styles.previewImage} />
+          </TouchableOpacity>
+        ) : null}
+
+        <Modal visible={showPhotoPreview} animationType="slide" onRequestClose={() => setShowPhotoPreview(false)}>
+          <View style={styles.previewModal}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.fullImage} resizeMode="contain" />
+            ) : null}
+            <View style={styles.previewActions}>
+              <TouchableOpacity
+                style={[styles.imageButton, { flex: 1, marginRight: 8 }]}
+                onPress={() => {
+                  // retake: open camera
+                  setShowPhotoPreview(false);
+                  setTimeout(() => setShowCamera(true), 120);
+                }}
+              >
+                <Text style={styles.imageButtonText}>Ambil ulang foto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.imageButton, { flex: 1, backgroundColor: "#10b981" }]}
+                onPress={() => setShowPhotoPreview(false)}
+              >
+                <Text style={styles.imageButtonText}>Gunakan foto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showWatermarker} animationType="fade" onRequestClose={() => setShowWatermarker(false)}>
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            {photoBase64 ? (
+              <ImageWatermarker
+                photoBase64={photoBase64}
+                heading={heading}
+                dateStr={new Date().toLocaleString('id-ID')}
+                address={addressParts}
+                onDone={(newBase64) => {
+                  // set processed image
+                  setPhotoBase64(newBase64);
+                  setPhotoUri(`data:image/jpeg;base64,${newBase64}`);
+                  setShowWatermarker(false);
+                  setShowPhotoPreview(true);
+                }}
+                onError={(err) => {
+                  console.warn('[watermarker] error', err);
+                  setShowWatermarker(false);
+                  setShowPhotoPreview(true);
+                }}
+              />
+            ) : null}
+          </View>
+        </Modal>
 
         <Text style={styles.label}>Lokasi GPS</Text>
         <TextInput
@@ -287,15 +411,17 @@ export default function CreateReportScreen() {
         {locationError ? <Text style={styles.helper}>{locationError}</Text> : null}
 
         <View style={styles.mapContainer}>
-          <Text style={styles.mapLabel}>Pilih lokasi di peta</Text>
+          <Text style={styles.mapLabel}>
+            {photoUri ? "Lokasi dikunci setelah foto diambil" : "Pilih lokasi di peta"}
+          </Text>
           <OpenStreetMapView
             style={styles.map}
             latitude={mapRegion.latitude}
             longitude={mapRegion.longitude}
             zoom={14}
-            interactive
+            interactive={!photoUri}
             markerCoordinate={selectedCoordinate}
-            onCoordinateSelected={(coordinate) => setSelectedCoordinate(coordinate)}
+            onCoordinateSelected={!photoUri ? (coordinate) => setSelectedCoordinate(coordinate) : undefined}
           />
         </View>
 

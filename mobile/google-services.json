@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "677707132530",
+    "project_id": "monitoring-lapangan-96a4d",
+    "storage_bucket": "monitoring-lapangan-96a4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:677707132530:android:07867e76631c2c3f369ceb",
+        "android_client_info": {
+          "package_name": "com.mobile.monitoring"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGcoC0qSw4sVFunHrFkjJJHcDgMGQvnoM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

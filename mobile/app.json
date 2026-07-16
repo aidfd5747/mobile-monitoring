@@ -22,7 +22,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.mobile.monitoring"
+      "package": "com.mobile.monitoring",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
@@ -33,7 +34,8 @@
       }
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ]
   }
 }
