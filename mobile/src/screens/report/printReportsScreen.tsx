@@ -64,6 +64,8 @@ const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
   const centerOffsetY = 57.5 - ((yTile - yBase) * 256 + yFrac * 256);
 
   return {
+    xTile,
+    yTile,
     urls: [
       tileUrl(xBase, yBase),
       tileUrl(xBase + 1, yBase),
@@ -84,12 +86,22 @@ const getOsmTileGrid = (latitude: number, longitude: number, zoom = 15) => {
   };
 };
 
-// Ambil URL gambar peta statis yang sudah diformat dengan marker di tengah
-// Menggunakan layanan staticmap.openstreetmap.de untuk menghasilkan
-// PNG terpusat pada koordinat dan zoom yang diinginkan.
-const getOsmTileUrl = (latitude: number, longitude: number, zoom = 15) => {
-  const url = `https://staticmap.openstreetmap.de/staticmap.php?center=${latitude},${longitude}&zoom=${zoom}&size=160x120&markers=${latitude},${longitude},red-pushpin`;
-  return { url };
+// Ambil daftar URL peta yang bisa dipilih untuk cache/fallback.
+// Gunakan penyedia Carto basemaps untuk menghindari penggunaan server tile OpenStreetMap volunteer-run.
+const getOsmMapSources = (latitude: number, longitude: number, zoom = 15) => {
+  const tileInfo = getOsmTileGrid(latitude, longitude, zoom);
+  const tileKey = `${zoom}/${tileInfo.xTile}/${tileInfo.yTile}.png`;
+  const apiRoot = (process.env.EXPO_PUBLIC_API_URL || "https://mobile-monitoring-production.up.railway.app/api").replace(/\/api\/?$/, "");
+  const proxyBase = `${apiRoot}/tiles`;
+  const tileVariants = [
+    `${proxyBase}/${zoom}/${tileInfo.xTile}/${tileInfo.yTile}.png`,
+    `${proxyBase}/${zoom}/${tileInfo.xTile}/${tileInfo.yTile}.png`,
+    `${proxyBase}/${zoom}/${tileInfo.xTile}/${tileInfo.yTile}.png`,
+  ];
+
+  return {
+    urls: tileVariants,
+  };
 };
 
 // Hitung hash sederhana dari string untuk nama file cache unik
@@ -103,48 +115,88 @@ const getMapCacheUri = (url: string) => {
   return `${cacheDir}${fileName}`;
 };
 
-// Konversi ArrayBuffer ke base64
-const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  if (typeof btoa !== "undefined") {
-    return btoa(binary);
-  }
-  // Fallback: use Buffer if tersedia
-  // @ts-ignore
-  if (typeof Buffer !== "undefined") return Buffer.from(binary, "binary").toString("base64");
-  throw new Error("No base64 conversion available");
-};
+// Download a list of tile URLs, cache them locally and return their base64 content array.
+const downloadTilesAsBase64 = async (urls: string[]): Promise<string[]> => {
+  const placeholderBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="; // 1x1 transparent PNG
+  const results: string[] = [];
 
-// Download gambar peta (static map) sebagai base64 dan simpan ke cache lokal
-const cacheMapFile = async (url: string): Promise<string | undefined> => {
-  try {
-    const fileUri = getMapCacheUri(url);
-    const fileInfo = await FileSystem.getInfoAsync(fileUri);
-    if (fileInfo.exists) return fileUri;
+  for (const url of urls) {
+    try {
+      const fileUri = getMapCacheUri(url);
+      const info = await FileSystem.getInfoAsync(fileUri);
+      if (!info.exists) {
+        // attempt download
+        try {
+          await FileSystem.downloadAsync(url, fileUri);
+        } catch (err) {
+          console.warn("[print] tile download failed", url, err);
+        }
+      }
 
-    console.log("[print] fetching static map", url);
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.warn("[print] static map fetch failed", response.status, response.statusText);
-      return undefined;
+      const saved = await FileSystem.getInfoAsync(fileUri);
+      if (saved.exists) {
+        const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+        results.push(base64);
+        continue;
+      }
+    } catch (err) {
+      console.warn("[print] tile processing failed", url, err);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = arrayBufferToBase64(arrayBuffer);
-    await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-    const saved = await FileSystem.getInfoAsync(fileUri);
-    if (!saved.exists) throw new Error("failed to write cached map file");
-    console.log("[print] static map cached", fileUri);
-    return fileUri;
-  } catch (error) {
-    console.warn("[print] failed to cache map image", error, url);
-    return undefined;
+    // fallback placeholder
+    results.push(placeholderBase64);
   }
+
+  return results;
+};
+
+// Compose an inline SVG from nine base64 tiles and center-crop it to 160x120 with a marker at center.
+const composeTilesToSvgDataUrl = (tileBase64s: string[], fractionX: number, fractionY: number) => {
+  // tiles arranged left-to-right, top-to-bottom in tileBase64s (expect length 9)
+  // big canvas size = 3 * 256 = 768
+  const tileSize = 256;
+  const bigSize = tileSize * 3; // 768
+
+  // compute center pixel in the big canvas: (256 + xFrac*256, 256 + yFrac*256)
+  const centerX = tileSize + fractionX * tileSize;
+  const centerY = tileSize + fractionY * tileSize;
+
+  const viewW = 160;
+  const viewH = 120;
+  const viewX = Math.max(0, centerX - viewW / 2);
+  const viewY = Math.max(0, centerY - viewH / 2);
+
+  // build image elements
+  const images: string[] = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const idx = row * 3 + col;
+      const b64 = tileBase64s[idx] || "";
+      const x = col * tileSize;
+      const y = row * tileSize;
+      images.push(`<image x="${x}" y="${y}" width="${tileSize}" height="${tileSize}" href="data:image/png;base64,${b64}" />`);
+    }
+  }
+
+  // marker at center of view (relative to view box)
+  const markerCx = viewW / 2;
+  const markerCy = viewH / 2;
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${viewW}" height="${viewH}" viewBox="${viewX} ${viewY} ${viewW} ${viewH}">
+    <defs>
+      <style> .pin { stroke: #fff; stroke-width: 2px; }</style>
+    </defs>
+    ${images.join("\n    ")}
+    <g transform="translate(${viewX}, ${viewY})"></g>
+    <circle cx="${viewX + markerCx}" cy="${viewY + markerCy}" r="8" fill="#ff3b30" class="pin" />
+    <circle cx="${viewX + markerCx}" cy="${viewY + markerCy}" r="3" fill="#fff" />
+  </svg>`;
+
+  // encode as data url (URI-encoded to avoid btoa portability issues)
+  const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return svgDataUrl;
 };
 
 // Buat HTML laporan PDF dengan format yang mengikuti `format_laporan.html`
@@ -156,17 +208,11 @@ const buildPdfHtml = (reports: ReportItem[]) => {
       const date = report.createdAt
         ? new Date(report.createdAt).toLocaleString("id-ID")
         : "-";
-      const photoSrc = report.photoDataUrl || report.photoUrl || "";
+      const photoSrc = report.photoDataUrl?.startsWith("data:") ? report.photoDataUrl : "";
       const photoCell = photoSrc
         ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" width="160" height="120" /></div>`
         : "-";
-      const tileInfo = report.latitude !== undefined && report.longitude !== undefined
-        ? getOsmTileGrid(report.latitude, report.longitude)
-        : undefined;
-      const mapSrc = report.mapDataUrl ||
-        (report.latitude !== undefined && report.longitude !== undefined
-          ? getOsmTileUrl(report.latitude, report.longitude).url
-          : "");
+      const mapSrc = report.mapDataUrl?.startsWith("data:") ? report.mapDataUrl : "";
       const mapCell = mapSrc
         ? `<img class="map-img" src="${escapeHtml(mapSrc)}" alt="Peta lokasi" width="160" height="120" />`
         : "-";
@@ -233,10 +279,10 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         <div class="logo">LOGO</div>
         <div class="header-text">
           <h2>DINAS PEKERJAAN UMUM DAN PENATAAN RUANG</h2>
-          <h3>Bidang Monitoring Kegiatan Lapangan</h3>
-          <p>Jl. Sultan Syarif Kasim No. XX Dumai</p>
-          <p>Telp. (0765) XXXXXXX</p>
-          <p>Email : pupr@dumai.go.id</p>
+          <h3>Monitoring Kegiatan Lapangan</h3>
+          <p>Jl. Tuanku Tambusai, Bagan Besar, Kecamatan. Bukit Kapur, Kota Dumai, Riau</p>
+          <p>28826</p>
+          <p>Email : pu.kotadumai@gmail.com</p>
         </div>
       </div>
       <div class="title">
@@ -264,7 +310,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         <p>Dumai, ${escapeHtml(printedDate)}</p>
         <p>Mengetahui,</p>
         <div class="signature">
-          <p><strong>Administrator</strong></p>
+          <p><strong>Admin</strong></p>
         </div>
       </div>
     </body>
@@ -389,24 +435,17 @@ export default function PrintReportsScreen() {
           if (
             report.latitude !== undefined &&
             report.longitude !== undefined &&
-            !mapCacheUri
+            !mapDataUrl
           ) {
-            const tileInfo = getOsmTileUrl(report.latitude, report.longitude);
-            console.log("[print] map tile url", tileInfo.url, { latitude: report.latitude, longitude: report.longitude });
-            mapCacheUri = await cacheMapFile(tileInfo.url);
-            console.log("[print] map cache uri result", mapCacheUri);
-          }
-
-          if (mapCacheUri && !mapDataUrl) {
+            // build centered map image by downloading 3x3 tiles, composing into SVG and embedding as data URL
             try {
-              const base64 = await FileSystem.readAsStringAsync(mapCacheUri, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
-              mapDataUrl = `data:image/png;base64,${base64}`;
-              console.log("[print] map data url length", mapDataUrl.length);
-              console.log("[print] map data url prefix", mapDataUrl.slice(0, 80));
-            } catch (error) {
-              console.warn("[print] failed to read cached map as base64", error, mapCacheUri);
+              const grid = getOsmTileGrid(report.latitude, report.longitude);
+              console.log("[print] map tile urls", grid.urls);
+              const tileBase64s = await downloadTilesAsBase64(grid.urls);
+              mapDataUrl = composeTilesToSvgDataUrl(tileBase64s, grid.fractionX, grid.fractionY);
+              console.log("[print] composed map data url length", mapDataUrl?.length);
+            } catch (err) {
+              console.warn("[print] failed to compose map image", err);
             }
           }
 

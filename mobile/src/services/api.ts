@@ -12,13 +12,14 @@ const api = axios.create({
 // Interceptor request: menyisipkan token JWT di header jika tersedia.
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem("token");
+  const validToken = token && token !== "null" && token !== "undefined" ? token : null;
 
-  if (token) {
+  if (validToken) {
     config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = `Bearer ${validToken}`;
   }
 
-  console.log("[api] request", config.method?.toUpperCase(), config.url);
+  console.log("[api] request", config.method?.toUpperCase(), config.url, validToken ? "(auth)" : "(no auth)");
   return config;
 });
 
@@ -28,8 +29,12 @@ api.interceptors.response.use(
     console.log("[api] response", response.status, response.config.url);
     return response;
   },
-  (error) => {
+  async (error) => {
     console.log("[api] response error", error.response?.status, error.response?.data, error.config?.url);
+    if (error.response?.status === 401) {
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user");
+    }
     return Promise.reject(error);
   }
 );

@@ -92,7 +92,7 @@ export default function ImageWatermarker({ photoBase64, heading = 0, dateStr, ad
 
             // draw date and address bottom-right
             const padding = 16;
-            const text = `${dateText} | ${addrText}`;
+            const text = "${dateText} | ${addrText}";
             ctx.font = '20px sans-serif';
             ctx.textBaseline = 'bottom';
             const lines = [];

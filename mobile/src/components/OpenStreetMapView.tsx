@@ -66,8 +66,11 @@ export default function OpenStreetMapView({
       tap: interactive,
     });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+    // Use backend tile proxy by default to avoid volunteer OSM tile usage.
+    const apiRoot = (process.env.EXPO_PUBLIC_API_URL || "https://mobile-monitoring-production.up.railway.app/api").replace(/\/api\/?$/, "");
+    const tileUrl = `${apiRoot}/tiles/{z}/{x}/{y}.png`;
+    L.tileLayer(tileUrl, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);
 

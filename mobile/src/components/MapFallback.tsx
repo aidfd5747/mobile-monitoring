@@ -59,11 +59,20 @@ export default function MapFallback({
       onPress={onPress}
       onRegionChangeComplete={onRegionChangeComplete}
     >
-      <UrlTile
-        urlTemplate={tileTemplate ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
-        maximumZ={19}
-        flipY={false}
-      />
+      {
+        (() => {
+          // Derive backend tile proxy root from EXPO env or default API URL
+          const apiRoot = (process.env.EXPO_PUBLIC_API_URL || "https://mobile-monitoring-production.up.railway.app/api").replace(/\/api\/?$/, "");
+          const proxyTemplate = `${apiRoot}/tiles/{z}/{x}/{y}.png`;
+          return (
+            <UrlTile
+              urlTemplate={tileTemplate ?? proxyTemplate}
+              maximumZ={19}
+              flipY={false}
+            />
+          );
+        })()
+      }
       {markerCoordinate ? <Marker coordinate={markerCoordinate} /> : null}
     </MapView>
   );

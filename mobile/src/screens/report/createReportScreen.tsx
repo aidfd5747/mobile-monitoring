@@ -35,9 +35,13 @@ export default function CreateReportScreen() {
   const [loading, setLoading] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoWatermarkedBase64, setPhotoWatermarkedBase64] = useState<string | null>(null);
   const [heading, setHeading] = useState<number>(0);
   const [showWatermarker, setShowWatermarker] = useState(false);
   const [addressParts, setAddressParts] = useState<any>({});
+  const previewUri = photoWatermarkedBase64
+    ? `data:image/jpeg;base64,${photoWatermarkedBase64}`
+    : photoUri;
   const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [mapRegion, setMapRegion] = useState({
@@ -264,43 +268,43 @@ export default function CreateReportScreen() {
           ref={cameraRef}
           style={styles.cameraView}
           facing="back"
-        >
-          <View style={styles.frameOverlay} />
+        />
 
-          <View style={styles.overlayTopLeft}>
-            <Text style={styles.overlayCompass}>N</Text>
-            <Text style={styles.overlayCompassLabel}>Compass</Text>
-          </View>
+        <View style={styles.frameOverlay} />
 
-          <View style={styles.overlayBottomLeft}>
-            <View style={styles.mapBadge}>
-              <View style={styles.mapIconWrap}>
-                <Text style={styles.mapBadgeIcon}>⌖</Text>
-              </View>
-              <View>
-                <Text style={styles.mapBadgeTitle}>Map</Text>
-                <Text style={styles.mapBadgeText}>
-                  {selectedCoordinate
-                    ? `${selectedCoordinate.latitude.toFixed(4)}, ${selectedCoordinate.longitude.toFixed(4)}`
-                    : "Lokasi aktif"}
-                </Text>
-              </View>
+        <View style={styles.overlayTopLeft}>
+          <Text style={styles.overlayCompass}>N</Text>
+          <Text style={styles.overlayCompassLabel}>Compass</Text>
+        </View>
+
+        <View style={styles.overlayBottomLeft}>
+          <View style={styles.mapBadge}>
+            <View style={styles.mapIconWrap}>
+              <Text style={styles.mapBadgeIcon}>⌖</Text>
+            </View>
+            <View>
+              <Text style={styles.mapBadgeTitle}>Map</Text>
+              <Text style={styles.mapBadgeText}>
+                {selectedCoordinate
+                  ? `${selectedCoordinate.latitude.toFixed(4)}, ${selectedCoordinate.longitude.toFixed(4)}`
+                  : "Lokasi aktif"}
+              </Text>
             </View>
           </View>
+        </View>
 
-          <View style={styles.overlayBottomRight}>
-            <Text style={styles.watermarkText}>MOBILE MONITORING</Text>
-          </View>
+        <View style={styles.overlayBottomRight}>
+          <Text style={styles.watermarkText}>MOBILE MONITORING</Text>
+        </View>
 
-          <View style={styles.cameraCaptureBar}>
-            <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
-              <View style={styles.captureInner} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCamera(false)}>
-              <Text style={styles.cancelButtonText}>Batal</Text>
-            </TouchableOpacity>
-          </View>
-        </CameraView>
+        <View style={styles.cameraCaptureBar}>
+          <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
+            <View style={styles.captureInner} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCamera(false)}>
+            <Text style={styles.cancelButtonText}>Batal</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -341,16 +345,16 @@ export default function CreateReportScreen() {
         <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
           <Text style={styles.imageButtonText}>{photoUri ? "Ambil ulang foto" : "Ambil foto"}</Text>
         </TouchableOpacity>
-        {photoUri ? (
+        {previewUri ? (
           <TouchableOpacity onPress={() => setShowPhotoPreview(true)}>
-            <Image source={{ uri: photoUri }} style={styles.previewImage} />
+            <Image source={{ uri: previewUri }} style={styles.previewImage} />
           </TouchableOpacity>
         ) : null}
 
         <Modal visible={showPhotoPreview} animationType="slide" onRequestClose={() => setShowPhotoPreview(false)}>
           <View style={styles.previewModal}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.fullImage} resizeMode="contain" />
+            {previewUri ? (
+              <Image source={{ uri: previewUri }} style={styles.fullImage} resizeMode="contain" />
             ) : null}
             <View style={styles.previewActions}>
               <TouchableOpacity
@@ -382,9 +386,7 @@ export default function CreateReportScreen() {
                 dateStr={new Date().toLocaleString('id-ID')}
                 address={addressParts}
                 onDone={(newBase64) => {
-                  // set processed image
-                  setPhotoBase64(newBase64);
-                  setPhotoUri(`data:image/jpeg;base64,${newBase64}`);
+                  setPhotoWatermarkedBase64(newBase64);
                   setShowWatermarker(false);
                   setShowPhotoPreview(true);
                 }}
@@ -684,6 +686,22 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.8,
+  },
+  previewModal: {
+    flex: 1,
+    backgroundColor: "#000",
+    padding: 16,
+    justifyContent: "center",
+  },
+  fullImage: {
+    width: "100%",
+    height: "80%",
+    marginBottom: 20,
+  },
+  previewActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
   },
   buttonContent: {
     flexDirection: "row",

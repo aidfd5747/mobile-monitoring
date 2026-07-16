@@ -8,6 +8,7 @@ import testRoutes from "./routes/testRoutes";
 import authRoutes from "./routes/authRoutes";
 import reportRoutes from "./routes/reportRoutes";
 import summaryRoutes from "./routes/summaryRoutes";
+import tileProxy from "./routes/tileProxy";
 
 dotenv.config();
 
@@ -30,6 +31,9 @@ app.use(
   "/api/reports/summary",
   summaryRoutes
 );
+
+// Tile proxy for map tiles (cached)
+app.use('/tiles', tileProxy);
 
 app.get('/', (_, res) => {
   // Route root untuk memastikan API berjalan.
