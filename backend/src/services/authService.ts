@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import { firestore } from "../config/firebase";
 import { User } from "../types/user";
+import { FirestorePushToken } from "./reportService";
 
 export class AuthService {
   // Buat akun user baru dengan password hashed.

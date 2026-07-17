@@ -27,7 +27,7 @@ interface FirestoreNotification {
   createdAt?: string;
 }
 
-interface FirestorePushToken {
+export interface FirestorePushToken {
   id: string;
   userId?: string;
   role?: string;
