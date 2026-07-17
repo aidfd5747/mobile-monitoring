@@ -83,10 +83,12 @@ export class AuthService {
     });
 
     const snapshot = await docRef.get();
-    return {
+    const saved = {
       id: docRef.id,
       ...snapshot.data(),
     };
+    console.log("[backend] push token saved", saved);
+    return saved;
   }
 
   // Perbarui username atau password user.

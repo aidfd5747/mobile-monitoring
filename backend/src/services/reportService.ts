@@ -57,9 +57,11 @@ const supabase = createClient(
 export class ReportService {
   static async sendExpoPushNotifications(tokens: string[], title: string, body: string) {
     if (!tokens.length) {
+      console.log("[backend] sendExpoPushNotifications called with no tokens");
       return;
     }
 
+    console.log("[backend] sendExpoPushNotifications tokens", tokens.length, tokens);
     const chunks: Array<Array<Record<string, any>>> = [];
     for (let i = 0; i < tokens.length; i += 100) {
       chunks.push(
@@ -68,6 +70,8 @@ export class ReportService {
           sound: "default",
           title,
           body,
+          priority: "high",
+          channelId: "default",
           data: {
             type: "report-update",
           },
@@ -91,6 +95,10 @@ export class ReportService {
 
         if (!response.ok) {
           console.error("[backend] expo push returned error status", response.status, result);
+        }
+
+        if (result?.errors) {
+          console.error("[backend] expo push errors", result.errors);
         }
       }
     } catch (error) {
@@ -183,6 +191,7 @@ export class ReportService {
     });
 
     const adminPushTokens = await this.getPushTokensByRole("admin");
+    console.log("[backend] admin push tokens", adminPushTokens.length, adminPushTokens);
     await this.sendExpoPushNotifications(
       adminPushTokens,
       "Laporan baru",

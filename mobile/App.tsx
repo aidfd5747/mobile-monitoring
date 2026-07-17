@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { useContext, useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
@@ -18,48 +19,59 @@ function NotificationBootstrap() {
   const registered = useRef(false);
 
   useEffect(() => {
-    const registerPushToken = async () => {
-      if (!Device.isDevice || !user?.id || !token || registered.current) {
-        return;
+    let subscription: any;
+    let responseSubscription: any;
+
+    const initializeNotifications = async () => {
+      try {
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync("default", {
+            name: "default",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+          });
+        }
+      } catch (error) {
+        console.log("[push] channel setup failed", error);
       }
 
-      const permission = await Notifications.requestPermissionsAsync();
-      console.log("[push] permissions", permission);
+      try {
+        if (Device.isDevice && user?.id && token && !registered.current) {
+          const permission = await Notifications.requestPermissionsAsync();
+          console.log("[push] permissions", permission);
 
-      const pushToken = await Notifications.getExpoPushTokenAsync();
-      console.log("[push] expo token", pushToken?.data);
+          const pushToken = await Notifications.getExpoPushTokenAsync();
+          console.log("[push] expo token", pushToken?.data);
 
-      if (!pushToken?.data) {
-        return;
+          if (pushToken?.data) {
+            const response = await api.post("/auth/push-token", {
+              expoPushToken: pushToken.data,
+            });
+            console.log("[push] server save response", response.data);
+            registered.current = true;
+            console.log("[push] token saved to server", pushToken.data);
+          }
+        }
+      } catch (error) {
+        console.log("[push] token registration failed", error);
       }
 
-      await api.post("/auth/push-token", {
-        expoPushToken: pushToken.data,
+      subscription = Notifications.addNotificationReceivedListener((notification) => {
+        console.log("[push] foreground notification", notification.request.content.title, notification.request.content.body);
       });
 
-      registered.current = true;
-      console.log("[push] token saved to server", pushToken.data);
+      responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log("[push] user tapped notification", response.notification.request.content.title);
+      });
     };
 
-    registerPushToken().catch((error) => {
-      console.log("[push] token registration failed", error);
-    });
-  }, [user?.id, token]);
-
-  useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener((notification) => {
-      console.log("[push] foreground notification", notification.request.content.title, notification.request.content.body);
-    });
-
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log("[push] user tapped notification", response.notification.request.content.title);
-    });
+    initializeNotifications();
 
     return () => {
-      subscription.remove();
-      responseSubscription.remove();
+      subscription?.remove();
+      responseSubscription?.remove();
     };
-  }, []);
+  }, [user?.id, token]);
 
   return null;
 }

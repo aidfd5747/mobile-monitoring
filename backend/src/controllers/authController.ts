@@ -140,12 +140,14 @@ export class AuthController {
         return res.status(400).json({ message: "expoPushToken wajib diisi" });
       }
 
+      console.log("[backend] savePushToken request", { userId, role: req.user?.role, expoPushToken });
       const savedToken = await AuthService.savePushToken({
         userId,
         role: req.user?.role,
         expoPushToken,
       });
 
+      console.log("[backend] savePushToken success", savedToken);
       return res.json({ message: "Token push berhasil disimpan", token: savedToken });
     } catch (error) {
       console.error(error);
