@@ -64,15 +64,29 @@ export class AuthService {
 
   // Simpan token push perangkat untuk user tertentu.
   static async savePushToken(payload: { userId: string; role?: string; expoPushToken: string }) {
-    const existingSnapshot = await firestore.collection("pushTokens")
-      .where("userId", "==", payload.userId)
+    // Prefer unique expoPushToken: if token exists, update its owner (userId/role).
+    const tokenSnapshot = await firestore.collection("pushTokens")
       .where("expoPushToken", "==", payload.expoPushToken)
       .limit(1)
       .get();
 
-    if (!existingSnapshot.empty) {
-      const existingDoc = existingSnapshot.docs[0];
-      return { id: existingDoc.id, ...existingDoc.data() };
+    if (!tokenSnapshot.empty) {
+      const doc = tokenSnapshot.docs[0];
+      const data = doc.data() as FirestorePushToken;
+
+      const needsUpdate = data.userId !== payload.userId || data.role !== payload.role;
+      if (needsUpdate) {
+        await firestore.collection("pushTokens").doc(doc.id).update({
+          userId: payload.userId,
+          role: payload.role,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      const updatedSnapshot = await firestore.collection("pushTokens").doc(doc.id).get();
+      const saved = { id: doc.id, ...updatedSnapshot.data() } as FirestorePushToken & { id: string };
+      console.log("[backend] push token upserted", saved);
+      return saved;
     }
 
     const docRef = await firestore.collection("pushTokens").add({
@@ -86,7 +100,7 @@ export class AuthService {
     const saved = {
       id: docRef.id,
       ...snapshot.data(),
-    };
+    } as FirestorePushToken & { id: string };
     console.log("[backend] push token saved", saved);
     return saved;
   }

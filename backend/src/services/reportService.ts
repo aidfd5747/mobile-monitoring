@@ -109,7 +109,7 @@ export class ReportService {
   static async getPushTokensByRole(role?: string) {
     const snapshot = await firestore.collection("pushTokens").get();
 
-    return snapshot.docs
+    const tokens = snapshot.docs
       .map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -117,6 +117,9 @@ export class ReportService {
       .filter((item) => item.role === role)
       .map((item) => String(item.expoPushToken ?? ""))
       .filter(Boolean);
+
+    // Deduplicate token values
+    return Array.from(new Set(tokens));
   }
 
   static async getPushTokensByUserId(userId?: string) {
@@ -134,7 +137,8 @@ export class ReportService {
         ...doc.data(),
       } as FirestorePushToken))
       .map((item) => String(item.expoPushToken ?? ""))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i);
   }
 
   // Buat laporan baru: unggah foto ke Supabase jika ada, lalu simpan ke Firestore.
