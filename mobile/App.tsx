@@ -10,8 +10,6 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
   }),
 });
 
@@ -25,18 +23,22 @@ function NotificationBootstrap() {
         return;
       }
 
-      await Notifications.requestPermissionsAsync();
+      const permission = await Notifications.requestPermissionsAsync();
+      console.log("[push] permissions", permission);
 
       const pushToken = await Notifications.getExpoPushTokenAsync();
+      console.log("[push] expo token", pushToken?.data);
 
       if (!pushToken?.data) {
         return;
       }
 
-      registered.current = true;
       await api.post("/auth/push-token", {
         expoPushToken: pushToken.data,
       });
+
+      registered.current = true;
+      console.log("[push] token saved to server", pushToken.data);
     };
 
     registerPushToken().catch((error) => {

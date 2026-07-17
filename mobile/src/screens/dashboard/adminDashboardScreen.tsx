@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
@@ -17,12 +17,6 @@ interface SummaryData {
   }>;
 }
 
-interface NotificationItem {
-  id: string;
-  message: string;
-  createdAt?: string;
-}
-
 // Layar dashboard khusus admin untuk monitoring laporan dan ringkasan statistik
 export default function AdminDashboardScreen() {
   // Data pengguna dan navigasi untuk membuka detail laporan
@@ -30,7 +24,6 @@ export default function AdminDashboardScreen() {
   const navigation = useNavigation<any>();
   // Ringkasan statistik laporan dari backend
   const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   // Status loading saat memuat data summary
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.role === "admin";
@@ -57,29 +50,13 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const loadNotifications = async () => {
-    try {
-      const response = await api.get("/reports/notifications");
-      const nextNotifications = response.data.notifications ?? [];
-      setNotifications(nextNotifications);
-
-      if (nextNotifications.length) {
-        Alert.alert("Notifikasi", nextNotifications[0].message);
-      }
-    } catch (error) {
-      setNotifications([]);
-    }
-  };
-
   useEffect(() => {
     loadSummary();
-    loadNotifications();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadSummary();
-      loadNotifications();
       return () => undefined;
     }, [])
   );
@@ -145,21 +122,6 @@ export default function AdminDashboardScreen() {
         )}
       </View>
 
-      <View style={styles.notificationPanel}>
-        <Text style={styles.panelTitle}>Notifikasi</Text>
-        {notifications.length ? (
-          notifications.slice(0, 3).map((item) => (
-            <View key={item.id} style={styles.notificationItem}>
-              <Text style={styles.notificationMessage}>{item.message}</Text>
-              <Text style={styles.notificationMeta}>
-                {item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "Baru"}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.empty}>Belum ada notifikasi.</Text>
-        )}
-      </View>
     </ScrollView>
   );
 }

@@ -1,58 +1,22 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from "react-native";
-import { useCallback, useContext, useEffect, useState } from "react";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { useContext } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { AuthContext } from "../../context/authContext";
 import AppCard from "../../components/AppCard";
-import api from "../../services/api";
-
-interface NotificationItem {
-  id: string;
-  message: string;
-  createdAt?: string;
-}
 
 // Layar dashboard utama yang menampilkan ringkasan untuk admin atau petugas
 export default function DashboardScreen() {
   const { user } = useContext(AuthContext);
   const navigation = useNavigation<any>();
   const isAdmin = user?.role === "admin";
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const greetingTitle = isAdmin ? "Dashboard Admin" : "Dashboard Petugas";
   const greetingText = isAdmin
     ? "Pantau kegiatan lapangan dan kelola laporan secara cepat."
     : "Siapkan laporan harian dengan foto, lokasi, dan status terbaru.";
 
-  const loadNotifications = async () => {
-    try {
-      const response = await api.get("/reports/notifications");
-      setNotifications(response.data.notifications ?? []);
-    } catch (error) {
-      setNotifications([]);
-    }
-  };
-
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadNotifications();
-      return () => undefined;
-    }, [])
-  );
-
   const openCreateReport = () => {
     navigation.navigate("CreateReport", { autoCamera: true });
-  };
-
-  const showLatestNotification = () => {
-    if (!notifications.length) {
-      return;
-    }
-
-    Alert.alert("Notifikasi", notifications[0].message);
   };
 
   return (
@@ -77,29 +41,6 @@ export default function DashboardScreen() {
         <AppCard title="Fitur utama" value="Input laporan, foto, lokasi, dan riwayat" />
       </View>
 
-      <View style={styles.notificationPanel}>
-        <View style={styles.notificationHeader}>
-          <Text style={styles.panelTitle}>Notifikasi</Text>
-          {notifications.length ? (
-            <TouchableOpacity onPress={showLatestNotification}>
-              <Text style={styles.linkText}>Lihat</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {notifications.length ? (
-          notifications.slice(0, 3).map((item) => (
-            <View key={item.id} style={styles.notificationItem}>
-              <Text style={styles.notificationMessage}>{item.message}</Text>
-              <Text style={styles.notificationMeta}>
-                {item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "Baru"}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Belum ada notifikasi.</Text>
-        )}
-      </View>
     </ScrollView>
   );
 }

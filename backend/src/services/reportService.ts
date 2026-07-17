@@ -60,28 +60,39 @@ export class ReportService {
       return;
     }
 
-    const notificationPayload = {
-      to: tokens,
-      sound: "default",
-      title,
-      body,
-      data: {
-        type: "report-update",
-      },
-    };
+    const chunks: Array<Array<Record<string, any>>> = [];
+    for (let i = 0; i < tokens.length; i += 100) {
+      chunks.push(
+        tokens.slice(i, i + 100).map((token) => ({
+          to: token,
+          sound: "default",
+          title,
+          body,
+          data: {
+            type: "report-update",
+          },
+        }))
+      );
+    }
 
     try {
-      const response = await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(notificationPayload),
-      });
+      for (const chunk of chunks) {
+        const response = await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(chunk),
+        });
 
-      const result = await response.json();
-      console.log("[backend] expo push response", result);
+        const result = await response.json();
+        console.log("[backend] expo push response", result);
+
+        if (!response.ok) {
+          console.error("[backend] expo push returned error status", response.status, result);
+        }
+      }
     } catch (error) {
       console.error("[backend] expo push failed", error);
     }
