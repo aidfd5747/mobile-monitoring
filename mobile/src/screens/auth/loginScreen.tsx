@@ -7,6 +7,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ImageBackground,
 } from "react-native";
 
 import { useState, useContext } from "react";
@@ -49,18 +50,29 @@ export default function LoginScreen() {
     }
   };
 
+  // Ganti file ini dengan gambar background tempat kerja Anda.
+  // Simpan file di mobile/src/assets/ dan ganti path berikut setelah file valid tersedia.
+  const backgroundSource = require("../../assets/images.png");
+
   return (
-    <KeyboardAvoidingView
+    <ImageBackground
+      source={backgroundSource}
+      resizeMode="cover"
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      imageStyle={styles.backgroundImage}
     >
-      <View style={styles.card}>
-        <Text style={styles.title}>Monitoring Lapangan</Text>
-        <Text style={styles.subtitle}>Masuk sebagai petugas lapangan</Text>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={styles.card}>
+          <Text style={styles.title}>Monitoring Lapangan</Text>
+          <Text style={styles.subtitle}>Masuk sebagai petugas lapangan</Text>
 
         <TextInput
           style={styles.input}
           placeholder="Username"
+          placeholderTextColor="#94a3b8"
           autoCapitalize="none"
           value={username}
           onChangeText={setUsername}
@@ -69,6 +81,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Password"
+          placeholderTextColor="#94a3b8"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
@@ -78,36 +91,43 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>{loading ? "Memproses..." : "Login"}</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  backgroundImage: {
+    opacity: 0.6,
+  },
+  overlay: {
+    flex: 1,
     justifyContent: "center",
     padding: 24,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(23, 19, 19, 0.82)",
     borderRadius: 24,
     padding: 24,
-    shadowColor: "#0f172a",
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.25,
     shadowRadius: 18,
-    elevation: 5,
+    elevation: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#ffffff",
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    color: "#64748b",
+    color: "#ffffff",
     marginBottom: 20,
   },
   input: {

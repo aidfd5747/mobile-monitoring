@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Animated, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Animated, TouchableOpacity, Alert, Modal, ScrollView } from "react-native";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
+import { formatReportDate } from "../../utils/date";
 
 interface ReportItem {
   id: string;
@@ -25,13 +26,90 @@ export default function ReportHistoryScreen() {
   // Status loading saat mengambil laporan
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const isAdmin = user?.role === "admin";
-  // Filter tampilan laporan berdasarkan peran admin atau petugas
-  const visibleReports = isAdmin
+  const [selectedYear, setSelectedYear] = useState<string>("All");
+  const [selectedMonth, setSelectedMonth] = useState<string>("All");
+  const [selectedDay, setSelectedDay] = useState<string>("All");
+  const [openDropdown, setOpenDropdown] = useState<"year" | "month" | "day" | null>(null);
+
+  const monthNames = [
+    "All",
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  const accessibleReports = isAdmin
     ? reports.filter((report) => (report.status || "submitted").toLowerCase() === "completed")
     : reports.filter((report) => report.petugasId === user?.id || report.petugasName === user?.nama);
+
+  const reportYears = Array.from(
+    new Set(
+      accessibleReports
+        .map((report) => report.createdAt)
+        .filter(Boolean)
+        .map((createdAt) => new Date(createdAt!).getFullYear())
+        .filter((year) => !Number.isNaN(year))
+    )
+  );
+
+  const baseYears = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+  const allYears = Array.from(new Set([...baseYears, ...reportYears])).sort((a, b) => b - a);
+  const availableYears = ["All", ...allYears.map(String)];
+
+  const availableDays = ["All", ...Array.from({ length: 31 }, (_, i) => String(i + 1))];
+
+  const filteredReports = accessibleReports.filter((report) => {
+    if (!report.createdAt) {
+      return selectedYear === "All" && selectedMonth === "All" && selectedDay === "All";
+    }
+
+    const createdDate = new Date(report.createdAt);
+    if (Number.isNaN(createdDate.getTime())) {
+      return false;
+    }
+
+    if (selectedYear !== "All" && String(createdDate.getFullYear()) !== selectedYear) {
+      return false;
+    }
+
+    if (selectedMonth !== "All" && monthNames[createdDate.getMonth() + 1] !== selectedMonth) {
+      return false;
+    }
+
+    if (selectedDay !== "All" && String(createdDate.getDate()) !== selectedDay) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const reportsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredReports.length / reportsPerPage));
+  const displayedReports = filteredReports.slice(page * reportsPerPage, (page + 1) * reportsPerPage);
+  const hasPagination = totalPages > 1;
+
+  useEffect(() => {
+    if (page >= totalPages) {
+      setPage(Math.max(totalPages - 1, 0));
+    }
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [selectedYear, selectedMonth, selectedDay]);
 
   // Ambil daftar laporan dari backend dan set animasi fade setelah selesai
   const loadReports = useCallback(async () => {
@@ -40,8 +118,10 @@ export default function ReportHistoryScreen() {
     try {
       const response = await api.get("/reports");
       setReports(response.data.reports || []);
+      setPage(0);
     } catch (err) {
       setReports([]);
+      setPage(0);
     } finally {
       setLoading(false);
       Animated.timing(fadeAnim, {
@@ -129,8 +209,91 @@ export default function ReportHistoryScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Riwayat Laporan</Text>
+      <View style={styles.filterRow}>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setOpenDropdown("year")}>
+          <Text style={styles.filterLabel}>Tahun</Text>
+          <Text style={styles.filterValue}>{selectedYear}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setOpenDropdown("month")}>
+          <Text style={styles.filterLabel}>Bulan</Text>
+          <Text style={styles.filterValue}>{selectedMonth}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setOpenDropdown("day")}>
+          <Text style={styles.filterLabel}>Tanggal</Text>
+          <Text style={styles.filterValue}>{selectedDay}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal visible={openDropdown !== null} transparent animationType="fade" onRequestClose={() => setOpenDropdown(null)}>
+        <View style={styles.dropdownBackdrop}>
+          <TouchableOpacity style={styles.dropdownBackdropArea} activeOpacity={1} onPress={() => setOpenDropdown(null)} />
+          <View style={styles.dropdownCard}>
+            <Text style={styles.dropdownTitle}>
+              Pilih {openDropdown === "year" ? "Tahun" : openDropdown === "month" ? "Bulan" : "Tanggal"}
+            </Text>
+            <ScrollView contentContainerStyle={styles.dropdownList}>
+              {(
+                openDropdown === "year"
+                  ? availableYears
+                  : openDropdown === "month"
+                  ? monthNames
+                  : availableDays
+              ).map((option, index) => (
+                <TouchableOpacity
+                  key={`${openDropdown}-${option}-${index}`}
+                  style={[
+                    styles.dropdownOption,
+                    (openDropdown === "year" && selectedYear === option) ||
+                    (openDropdown === "month" && selectedMonth === option) ||
+                    (openDropdown === "day" && selectedDay === option)
+                      ? styles.dropdownOptionActive
+                      : null,
+                  ]}
+                  onPress={() => {
+                    if (openDropdown === "year") {
+                      setSelectedYear(option);
+                    } else if (openDropdown === "month") {
+                      setSelectedMonth(option);
+                    } else if (openDropdown === "day") {
+                      setSelectedDay(option);
+                    }
+                    setOpenDropdown(null);
+                  }}
+                >
+                  <Text style={styles.dropdownOptionText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {hasPagination ? (
+        <View style={styles.paginationContainer}>
+          <Text style={styles.pageInfo}>Halaman {page + 1} dari {totalPages}</Text>
+          <View style={styles.paginationRow}>
+            <TouchableOpacity
+              style={[styles.pageButton, page === 0 && styles.pageButtonDisabled]}
+              disabled={page === 0}
+              onPress={() => setPage((prev) => Math.max(prev - 1, 0))}
+            >
+              <Text style={styles.pageButtonText}>Sebelumnya</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.pageButton,
+                (page + 1) * reportsPerPage >= filteredReports.length && styles.pageButtonDisabled,
+              ]}
+              disabled={(page + 1) * reportsPerPage >= filteredReports.length}
+              onPress={() => setPage((prev) => prev + 1)}
+            >
+              <Text style={styles.pageButtonText}>Berikutnya</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
       <FlatList
-        data={visibleReports}
+        data={displayedReports}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 24 }}
         renderItem={({ item }) => (
@@ -144,7 +307,7 @@ export default function ReportHistoryScreen() {
             </View>
             <Text style={styles.cardMeta}>{item.categoryName || "Kategori"}</Text>
             <Text style={styles.description}>{item.description}</Text>
-            <Text style={styles.date}>{item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "-"}</Text>
+            <Text style={styles.date}>{formatReportDate(item.createdAt)}</Text>
             {item.status !== "completed" ? (
               <TouchableOpacity style={styles.editButton} onPress={() => openReportEdit(item)}>
                 <Text style={styles.editButtonText}>Edit</Text>
@@ -327,7 +490,99 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
   },
-   completed: {
+  paginationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 14,
+  },
+  pageButton: {
+    flex: 1,
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  pageButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: "#94a3b8",
+  },
+  pageButtonText: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+  pageInfo: {
+    color: "#334155",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 10,
+  },
+  filterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 14,
+  },
+  filterButton: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  filterLabel: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  filterValue: {
+    color: "#0f172a",
+    fontWeight: "700",
+  },
+  dropdownBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  dropdownBackdropArea: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dropdownCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 16,
+    maxHeight: "60%",
+  },
+  dropdownTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 12,
+  },
+  dropdownList: {
+    paddingBottom: 12,
+  },
+  dropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  dropdownOptionActive: {
+    backgroundColor: "#2563eb",
+  },
+  dropdownOptionText: {
+    color: "#0f172a",
+    fontWeight: "600",
+  },
+  paginationContainer: {
+    marginBottom: 14,
+  },
+  completed: {
     color: "#16a34a",
     fontWeight: "700",
   },

@@ -26,18 +26,34 @@ export default function AdminDashboardScreen() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   // Status loading saat memuat data summary
   const [loading, setLoading] = useState(true);
+  const [recentPage, setRecentPage] = useState(0);
   const isAdmin = user?.role === "admin";
-  // Hanya tampilkan laporan terbaru yang berstatus submitted
-  const visibleRecentReports = (summary?.recentReports ?? []).filter(
-    (item) => (item.status || "submitted").toLowerCase() === "submitted"
+  const recentReportsPerPage = 10;
+  const visibleRecentReports = summary?.recentReports ?? [];
+  const displayedRecentReports = visibleRecentReports.slice(
+    recentPage * recentReportsPerPage,
+    (recentPage + 1) * recentReportsPerPage
   );
 
   // Ambil ringkasan laporan dari backend
   const loadSummary = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/reports/summary");
-      setSummary(response.data.summary);
+      const response = await api.get("/reports");
+      const allReports = response.data.reports || [];
+      const submittedReports = allReports.filter(
+        (report: any) => (report.status || "submitted").toLowerCase() === "submitted"
+      );
+      const completedReports = allReports.filter(
+        (report: any) => (report.status || "submitted").toLowerCase() === "completed"
+      );
+      setSummary({
+        totalReports: allReports.length,
+        submitted: submittedReports.length,
+        completed: completedReports.length,
+        recentReports: submittedReports,
+      });
+      setRecentPage(0);
     } catch (error) {
       setSummary({
         totalReports: 0,
@@ -45,14 +61,11 @@ export default function AdminDashboardScreen() {
         completed: 0,
         recentReports: [],
       });
+      setRecentPage(0);
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadSummary();
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,9 +112,28 @@ export default function AdminDashboardScreen() {
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Laporan Terbaru</Text>
-        {visibleRecentReports.length ? (
-          visibleRecentReports.map((item) => (
+        <Text style={styles.panelTitle}>Laporan Petugas</Text>
+        <View style={styles.paginationRow}>
+          <TouchableOpacity
+            style={[styles.pageButton, recentPage === 0 && styles.pageButtonDisabled]}
+            disabled={recentPage === 0}
+            onPress={() => setRecentPage((prev) => Math.max(prev - 1, 0))}
+          >
+            <Text style={styles.pageButtonText}>Sebelumnya</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.pageButton,
+              (recentPage + 1) * recentReportsPerPage >= visibleRecentReports.length && styles.pageButtonDisabled,
+            ]}
+            disabled={(recentPage + 1) * recentReportsPerPage >= visibleRecentReports.length}
+            onPress={() => setRecentPage((prev) => prev + 1)}
+          >
+            <Text style={styles.pageButtonText}>Berikutnya</Text>
+          </TouchableOpacity>
+        </View>
+        {displayedRecentReports.length ? (
+          displayedRecentReports.map((item) => (
             <View key={item.id} style={styles.item}>
               <View style={styles.itemHeader}>
                 <View style={{ flex: 1 }}>
@@ -196,7 +228,7 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
   },
   panelTitle: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: "700",
     marginBottom: 10,
     color: "#0f172a",
@@ -253,5 +285,26 @@ const styles = StyleSheet.create({
   },
   empty: {
     color: "#64748b",
+  },
+  paginationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 14,
+    gap: 10,
+  },
+  pageButton: {
+    flex: 1,
+    backgroundColor: "#2563eb",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  pageButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: "#94a3b8",
+  },
+  pageButtonText: {
+    color: "#ffffff",
+    fontWeight: "700",
   },
 });

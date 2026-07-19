@@ -6,11 +6,12 @@ export class SummaryController {
     try {
       const reports = await ReportService.getReports();
 
+      const submittedReports = reports.filter((report) => report.status === "submitted");
       const summary = {
         totalReports: reports.length,
-        submitted: reports.filter((report) => report.status === "submitted").length,
+        submitted: submittedReports.length,
         completed: reports.filter((report) => report.status === "completed").length,
-        recentReports: reports.slice(0, 5),
+        recentReports: submittedReports,
       };
 
       return res.json({ summary });

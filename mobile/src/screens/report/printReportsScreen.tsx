@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
@@ -15,6 +17,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
+import { formatReportDate } from "../../utils/date";
 
 // Tipe data untuk satu item laporan yang dipilih atau ditampilkan
 interface ReportItem {
@@ -229,20 +232,12 @@ const composeTilesToSvgDataUrl = (tileBase64s: string[], fractionX: number, frac
 
 // Buat HTML laporan PDF dengan format yang mengikuti `format_laporan.html`
 const buildPdfHtml = (reports: ReportItem[]) => {
-  const statusLabel =
-    reports.length === 1 ? reports[0].status || "-" : "Semua";
   const rows = reports
     .map((report, index) => {
-      const date = report.createdAt
-        ? new Date(report.createdAt).toLocaleString("id-ID")
-        : "-";
-      const photoSrc = report.photoDataUrl?.startsWith("data:") ? report.photoDataUrl : "";
+      const date = formatReportDate(report.createdAt);
+      const photoSrc = report.photoDataUrl || report.photoUrl || "";
       const photoCell = photoSrc
-        ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" width="160" height="120" /></div>`
-        : "-";
-      const mapSrc = report.mapDataUrl?.startsWith("data:") ? report.mapDataUrl : "";
-      const mapCell = mapSrc
-        ? `<img class="map-img" src="${escapeHtml(mapSrc)}" alt="Peta lokasi" width="160" height="120" />`
+        ? `<div class="image-cell"><img src="${escapeHtml(photoSrc)}" alt="Foto laporan" /></div>`
         : "-";
 
       return `
@@ -251,9 +246,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
           <td>${escapeHtml(report.petugasName || "Petugas")}</td>
           <td>${escapeHtml(report.categoryName || "-")}</td>
           <td>${escapeHtml(report.description || "-")}</td>
-          <td>${escapeHtml(report.status || "submitted")}</td>
           <td>${escapeHtml(date)}</td>
-          <td>${mapCell}</td>
           <td>${photoCell}</td>
         </tr>`;
     })
@@ -287,16 +280,14 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         th, td { padding: 8px; font-size: 12px; word-wrap: break-word; vertical-align: top; }
         th { background-color: #f3f4f6; }
         th:nth-child(1), td:nth-child(1) { width: 3%; }
-        th:nth-child(2), td:nth-child(2) { width: 10%; }
-        th:nth-child(3), td:nth-child(3) { width: 10%; }
-        th:nth-child(4), td:nth-child(4) { width: 24%; text-align: left; }
-        th:nth-child(5), td:nth-child(5) { width: 8%; }
-        th:nth-child(6), td:nth-child(6) { width: 8%; }
-        th:nth-child(7), td:nth-child(7) { width: 20%; text-align: left; }
-        th:nth-child(8), td:nth-child(8) { width: 17%; }
+        th:nth-child(2), td:nth-child(2) { width: 12%; }
+        th:nth-child(3), td:nth-child(3) { width: 18%; text-align: left; }
+        th:nth-child(4), td:nth-child(4) { width: 25%; }
+        th:nth-child(5), td:nth-child(5) { width: 18%; }
+        th:nth-child(6), td:nth-child(6) { width: 24%; }
         .map-img { width: 160px; height: 120px; object-fit: cover; border-radius: 4px; display: block; }
-        .image-cell { display: inline-block; width: 160px; height: 120px; overflow: hidden; }
-        .image-cell img { width: 160px; height: 120px; object-fit: cover; display: block; border-radius: 4px; }
+        .image-cell { display: block; width: 100%; max-width: 100%; overflow: hidden; }
+        .image-cell img { width: 100%; height: auto; object-fit: cover; display: block; border-radius: 4px; }
         .footer { width: 300px; margin-left: auto; margin-top: 44px; text-align: center; font-size: 12px; }
         .signature { margin-top: 60px; }
         @media print { body { margin: 20px; } }
@@ -316,9 +307,6 @@ const buildPdfHtml = (reports: ReportItem[]) => {
       <div class="title">
         <h3>LAPORAN MONITORING KEGIATAN</h3>
       </div>
-      <div class="info">
-        <p><strong>Status</strong> : ${escapeHtml(statusLabel)}</p>
-      </div>
       <table>
         <thead>
           <tr>
@@ -326,9 +314,7 @@ const buildPdfHtml = (reports: ReportItem[]) => {
             <th>Petugas</th>
             <th>Kategori</th>
             <th>Deskripsi</th>
-            <th>Status</th>
             <th>Tanggal</th>
-            <th>Lokasi</th>
             <th>Foto</th>
           </tr>
         </thead>
@@ -352,14 +338,48 @@ export default function PrintReportsScreen() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   // Teks filter pencarian laporan
   const [search, setSearch] = useState("");
-  // Filter status (lowercase). Empty = no status filter applied.
-  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   // ID laporan yang dipilih untuk dicetak
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Status loading saat mengambil daftar laporan
   const [loading, setLoading] = useState(true);
   // Status sedang membuat PDF
   const [generating, setGenerating] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<string>("All");
+  const [selectedMonth, setSelectedMonth] = useState<string>("All");
+  const [selectedDay, setSelectedDay] = useState<string>("All");
+  const [openDropdown, setOpenDropdown] = useState<"year" | "month" | "day" | null>(null);
+
+  const monthNames = [
+    "All",
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  const reportYears = Array.from(
+    new Set(
+      reports
+        .filter((report) => (report.status || "").toLowerCase() === "completed")
+        .map((report) => report.createdAt)
+        .filter(Boolean)
+        .map((createdAt) => new Date(createdAt!).getFullYear())
+        .filter((year) => !Number.isNaN(year))
+    )
+  );
+
+  const baseYears = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+  const allYears = Array.from(new Set([...baseYears, ...reportYears])).sort((a, b) => b - a);
+  const availableYears = ["All", ...allYears.map(String)];
+  const availableDays = ["All", ...Array.from({ length: 31 }, (_, i) => String(i + 1))];
 
   useEffect(() => {
     // Ambil daftar laporan dari API saat komponen pertama kali dipasang
@@ -380,7 +400,6 @@ export default function PrintReportsScreen() {
   // Hitung daftar laporan yang cocok berdasarkan kata kunci pencarian dan filter status
   const filteredReports = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    console.log("[print] filtering reports", { search: normalized, total: reports.length, statusFilters });
 
     const matchesSearch = (report: ReportItem) => {
       if (!normalized) return true;
@@ -391,13 +410,38 @@ export default function PrintReportsScreen() {
       return haystack.includes(normalized);
     };
 
-    const matchesStatus = (report: ReportItem) => {
-      if (!statusFilters || statusFilters.length === 0) return true;
-      return statusFilters.includes((report.status || "").toLowerCase());
+    const matchesDateFilter = (report: ReportItem) => {
+      if (!report.createdAt) {
+        return selectedYear === "All" && selectedMonth === "All" && selectedDay === "All";
+      }
+
+      const createdDate = new Date(report.createdAt);
+      if (Number.isNaN(createdDate.getTime())) {
+        return false;
+      }
+
+      if (selectedYear !== "All" && String(createdDate.getFullYear()) !== selectedYear) {
+        return false;
+      }
+
+      if (selectedMonth !== "All" && monthNames[createdDate.getMonth() + 1] !== selectedMonth) {
+        return false;
+      }
+
+      if (selectedDay !== "All" && String(createdDate.getDate()) !== selectedDay) {
+        return false;
+      }
+
+      return true;
     };
 
-    return reports.filter((r) => matchesSearch(r) && matchesStatus(r));
-  }, [reports, search, statusFilters]);
+    return reports.filter(
+      (r) =>
+        matchesSearch(r) &&
+        (r.status || "").toLowerCase() === "completed" &&
+        matchesDateFilter(r)
+    );
+  }, [reports, search, selectedYear, selectedMonth, selectedDay]);
 
   // Toggle pemilihan laporan pada daftar cetak
   const toggleSelection = (reportId: string) => {
@@ -414,13 +458,6 @@ export default function PrintReportsScreen() {
     }
 
     setSelectedIds(filteredReports.map((item) => item.id));
-  };
-
-  // Toggle status filter (completed/submitted)
-  const toggleStatusFilter = (status: string) => {
-    setStatusFilters((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    );
   };
 
   // Buat dan bagikan file PDF berdasarkan laporan yang dipilih
@@ -583,44 +620,73 @@ export default function PrintReportsScreen() {
 
       <TextInput
         style={styles.searchInput}
-        placeholder="Cari laporan berdasarkan petugas, kategori, atau status"
+        placeholder="Cari laporan berdasarkan petugas atau kategori"
+        placeholderTextColor="#94a3b8"
+        returnKeyType="search"
         value={search}
         onChangeText={setSearch}
       />
 
       <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            statusFilters.includes("completed") && styles.filterButtonActive,
-          ]}
-          onPress={() => toggleStatusFilter("completed")}
-        >
-          <Ionicons
-            name={statusFilters.includes("completed") ? "checkbox" : "square-outline"}
-            size={16}
-            color={statusFilters.includes("completed") ? "#ffffff" : "#2563eb"}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={[styles.filterButtonText, statusFilters.includes("completed") && styles.filterButtonTextActive]}>Selesai</Text>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setOpenDropdown("year")}> 
+          <Text style={styles.filterLabel}>Tahun</Text>
+          <Text style={styles.filterValue}>{selectedYear}</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            statusFilters.includes("submitted") && styles.filterButtonActive,
-          ]}
-          onPress={() => toggleStatusFilter("submitted")}
-        >
-          <Ionicons
-            name={statusFilters.includes("submitted") ? "checkbox" : "square-outline"}
-            size={16}
-            color={statusFilters.includes("submitted") ? "#ffffff" : "#2563eb"}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={[styles.filterButtonText, statusFilters.includes("submitted") && styles.filterButtonTextActive]}>Menunggu</Text>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setOpenDropdown("month")}> 
+          <Text style={styles.filterLabel}>Bulan</Text>
+          <Text style={styles.filterValue}>{selectedMonth}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterButton} onPress={() => setOpenDropdown("day")}> 
+          <Text style={styles.filterLabel}>Tanggal</Text>
+          <Text style={styles.filterValue}>{selectedDay}</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={openDropdown !== null} transparent animationType="fade" onRequestClose={() => setOpenDropdown(null)}>
+        <View style={styles.dropdownBackdrop}>
+          <TouchableOpacity style={styles.dropdownBackdropArea} activeOpacity={1} onPress={() => setOpenDropdown(null)} />
+          <View style={styles.dropdownCard}>
+            <Text style={styles.dropdownTitle}>
+              Pilih {openDropdown === "year" ? "Tahun" : openDropdown === "month" ? "Bulan" : "Tanggal"}
+            </Text>
+            <ScrollView contentContainerStyle={styles.dropdownList}>
+              {(
+                openDropdown === "year"
+                  ? availableYears
+                  : openDropdown === "month"
+                  ? monthNames
+                  : availableDays
+              ).map((option, index) => {
+                const isActive =
+                  (openDropdown === "year" && selectedYear === option) ||
+                  (openDropdown === "month" && selectedMonth === option) ||
+                  (openDropdown === "day" && selectedDay === option);
+
+                return (
+                  <TouchableOpacity
+                    key={`${openDropdown}-${option}-${index}`}
+                    style={[styles.dropdownOption, isActive ? styles.dropdownOptionActive : null]}
+                    onPress={() => {
+                      if (openDropdown === "year") {
+                        setSelectedYear(option);
+                      } else if (openDropdown === "month") {
+                        setSelectedMonth(option);
+                      } else if (openDropdown === "day") {
+                        setSelectedDay(option);
+                      }
+                      setOpenDropdown(null);
+                    }}
+                  >
+                    <Text style={[styles.dropdownOptionText, isActive ? styles.dropdownOptionTextActive : null]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.secondaryButton} onPress={selectAll}>
@@ -694,7 +760,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#ffffff",
     marginBottom: 10,
     color: "black",
   },
@@ -794,25 +859,62 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   filterButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    flex: 1,
+    backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#cbd5e1",
-    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
-  filterButtonActive: {
-    backgroundColor: "#2563eb",
-    borderColor: "#2563eb",
+  filterLabel: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 4,
   },
-  filterButtonText: {
-    color: "#2563eb",
+  filterValue: {
+    color: "#0f172a",
     fontWeight: "700",
-    fontSize: 12,
   },
-  filterButtonTextActive: {
+  dropdownBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  dropdownBackdropArea: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dropdownCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 16,
+    maxHeight: "60%",
+  },
+  dropdownTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 12,
+  },
+  dropdownList: {
+    paddingBottom: 12,
+  },
+  dropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  dropdownOptionActive: {
+    backgroundColor: "#2563eb",
+  },
+  dropdownOptionText: {
+    color: "#0f172a",
+    fontWeight: "600",
+  },
+  dropdownOptionTextActive: {
     color: "#ffffff",
   },
 });

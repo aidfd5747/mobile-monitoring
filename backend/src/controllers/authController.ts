@@ -110,14 +110,16 @@ export class AuthController {
 
       const username = getStringValue(req.body.username);
       const password = getStringValue(req.body.password);
+      const nama = getStringValue(req.body.nama);
 
-      if (!username && !password) {
-        return res.status(400).json({ message: "Username atau password harus diisi" });
+      if (!username && !password && !nama) {
+        return res.status(400).json({ message: "Username, password, atau nama harus diisi" });
       }
 
       const updatedUser = await AuthService.updateUser(userId, {
         username: username.trim() || undefined,
         password: password.trim() || undefined,
+        nama: nama.trim() || undefined,
       });
 
       return res.json({ user: updatedUser });

@@ -12,13 +12,15 @@ interface ProfileData {
 
 // Layar profil pengguna, dengan opsi update username/password untuk petugas
 export default function ProfileScreen() {
-  const { user, logout } = useContext(AuthContext);
+  const { user, token, logout, login } = useContext(AuthContext);
   // Profil detail yang terambil dari backend untuk petugas
   const [profile, setProfile] = useState<ProfileData | null>(null);
   // Status loading saat memuat data profil
   const [loading, setLoading] = useState(true);
   // Status ketika menyimpan perubahan profil
   const [saving, setSaving] = useState(false);
+  // Nilai input nama pada form
+  const [nama, setNama] = useState("");
   // Input username baru
   const [username, setUsername] = useState("");
   // Input password baru
@@ -33,6 +35,7 @@ export default function ProfileScreen() {
       const response = await api.get("/auth/profile");
       setProfile(response.data.user);
       setUsername(response.data.user?.username ?? "");
+      setNama(response.data.user?.nama ?? "");
     } catch (error) {
       setProfile(null);
     } finally {
@@ -50,18 +53,25 @@ export default function ProfileScreen() {
 
   // Simpan perubahan profil username/password ke backend
   const handleSave = async () => {
-    if (!username.trim() && !password.trim()) {
-      Alert.alert("Tidak ada perubahan", "Isi username atau password untuk memperbarui profil.");
+    if (!username.trim() && !password.trim() && !nama.trim()) {
+      Alert.alert("Tidak ada perubahan", "Isi username, password, atau nama untuk memperbarui profil.");
       return;
     }
 
     setSaving(true);
 
     try {
-      await api.patch("/auth/profile", {
+      const response = await api.patch("/auth/profile", {
         username: username.trim(),
         password: password.trim(),
+        nama: nama.trim(),
       });
+
+      const updatedUser = response.data.user;
+      if (updatedUser) {
+        setProfile(updatedUser);
+        await login(updatedUser, token ?? "");
+      }
 
       Alert.alert("Berhasil", "Profil berhasil diperbarui.");
       setPassword("");
@@ -86,17 +96,28 @@ export default function ProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.title}>Profil</Text>
         <Text style={styles.label}>Nama: {profile?.nama || user?.nama || "-"}</Text>
-        <Text style={styles.label}>Role: {user?.role === "worker" ? "Petugas" : user?.role === "admin" ? "Administrator" : user?.role || "-"}</Text>
+        <Text style={styles.label}>{user?.role === "worker" ? "Petugas" : user?.role === "admin" ? "Admin" : user?.role || "-"}</Text>
       </View>
 
       {isWorker ? (
+        
         <View style={styles.card}>
+          <Text style={styles.inputLabel}>Nama baru</Text>
+          <TextInput
+            style={styles.input}
+            value={nama}
+            onChangeText={setNama}
+            placeholder="Nama baru"
+            placeholderTextColor="#94a3b8"
+            autoCapitalize="none"
+          />
           <Text style={styles.inputLabel}>Username baru</Text>
           <TextInput
             style={styles.input}
             value={username}
             onChangeText={setUsername}
             placeholder="Username baru"
+            placeholderTextColor="#94a3b8"
             autoCapitalize="none"
           />
           <Text style={styles.inputLabel}>Password baru</Text>
@@ -105,6 +126,7 @@ export default function ProfileScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="Password baru"
+            placeholderTextColor="#94a3b8"
             secureTextEntry
           />
           <TouchableOpacity style={styles.button} onPress={handleSave} disabled={saving}>
@@ -175,6 +197,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
     backgroundColor: "#ffffff",
+    color: "black",
   },
   logoutButton: {
     backgroundColor: "#2563eb",

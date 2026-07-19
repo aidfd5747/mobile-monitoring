@@ -13,6 +13,7 @@ import {
 import { useRoute } from "@react-navigation/native";
 import api from "../../services/api";
 import OpenStreetMapView from "../../components/OpenStreetMapView";
+import { formatReportDate } from "../../utils/date";
 
 interface ReportDetailItem {
   id: string;
@@ -36,6 +37,7 @@ export default function ReportDetailScreen() {
   const [loading, setLoading] = useState(!route.params?.report);
   // Status pemrosesan permintaan update status laporan
   const [processing, setProcessing] = useState(false);
+  const [photoAspectRatio, setPhotoAspectRatio] = useState<number | null>(null);
   const [mapRegion, setMapRegion] = useState({
     latitude: route.params?.report?.latitude ?? -6.200000,
     longitude: route.params?.report?.longitude ?? 106.816666,
@@ -78,6 +80,14 @@ export default function ReportDetailScreen() {
         latitude: report.latitude,
         longitude: report.longitude,
       }));
+    }
+
+    if (report?.photoUrl) {
+      Image.getSize(
+        report.photoUrl,
+        (width, height) => setPhotoAspectRatio(width / height),
+        () => setPhotoAspectRatio(null)
+      );
     }
   }, [report]);
 
@@ -143,7 +153,7 @@ export default function ReportDetailScreen() {
         </Text>
 
         <Text style={styles.label}>Waktu Dibuat</Text>
-        <Text style={styles.value}>{report.createdAt ? new Date(report.createdAt).toLocaleString("id-ID") : "-"}</Text>
+        <Text style={styles.value}>{formatReportDate(report.createdAt)}</Text>
 
         {report.latitude !== undefined && report.longitude !== undefined ? (
           <>
@@ -170,7 +180,11 @@ export default function ReportDetailScreen() {
         {report.photoUrl ? (
           <>
             <Text style={styles.label}>Foto</Text>
-            <Image source={{ uri: report.photoUrl }} style={styles.photo} />
+            <Image
+              source={{ uri: report.photoUrl }}
+              style={[styles.photo, photoAspectRatio ? { aspectRatio: photoAspectRatio } : { height: 240 }]}
+              resizeMode="contain"
+            />
           </>
         ) : null}
 
@@ -263,9 +277,9 @@ const styles = StyleSheet.create({
   },
   photo: {
     width: "100%",
-    height: 200,
     borderRadius: 12,
     marginTop: 8,
+    backgroundColor: "#f0f4f8",
   },
   button: {
     marginTop: 18,

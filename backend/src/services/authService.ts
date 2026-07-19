@@ -107,7 +107,7 @@ export class AuthService {
   }
 
   // Perbarui username atau password user.
-  static async updateUser(id: string, payload: { username?: string; password?: string }) {
+  static async updateUser(id: string, payload: { username?: string; password?: string; nama?: string }) {
     const updatePayload: Record<string, any> = {};
 
     if (payload.username) {
@@ -124,6 +124,10 @@ export class AuthService {
 
     if (payload.password) {
       updatePayload.password = await bcrypt.hash(payload.password, 10);
+    }
+
+    if (payload.nama) {
+      updatePayload.nama = payload.nama.trim();
     }
 
     if (Object.keys(updatePayload).length === 0) {

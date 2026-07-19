@@ -57,13 +57,13 @@ export default function CreateUserScreen() {
         <Text style={styles.subtitle}>Admin dapat membuat akun petugas baru untuk tim lapangan.</Text>
 
         <Text style={styles.label}>Nama Lengkap</Text>
-        <TextInput style={styles.input} value={nama} onChangeText={setNama} placeholder="Contoh: Budi Santoso" />
+        <TextInput style={styles.input} value={nama} onChangeText={setNama} placeholder="Contoh: Budi Santoso" placeholderTextColor="#94a3b8" />
 
         <Text style={styles.label}>Username</Text>
-        <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="username" autoCapitalize="none" />
+        <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="username" placeholderTextColor="#94a3b8" autoCapitalize="none" />
 
         <Text style={styles.label}>Password</Text>
-        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="password" secureTextEntry />
+        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="password" placeholderTextColor="#94a3b8" secureTextEntry />
 
         <TouchableOpacity style={styles.button} onPress={handleCreate} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Buat Akun</Text>}
