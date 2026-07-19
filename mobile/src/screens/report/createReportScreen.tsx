@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useContext, useRef, useState, useEffect } from "react";
 import * as Location from "expo-location";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { AuthContext } from "../../context/authContext";
 import { useLocation } from "../../hooks/useLocation";
@@ -23,17 +23,26 @@ import ImageWatermarker from "../../components/ImageWatermarker";
 // Halaman untuk membuat laporan baru dengan foto, kategori, dan lokasi GPS
 export default function CreateReportScreen() {
   const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   // Data pengguna yang membuat laporan
   const { user } = useContext(AuthContext);
   // Lokasi saat ini dari hook custom useLocation
   const { location, error: locationError, loading: locationLoading } = useLocation();
+  const reportToEdit = route.params?.report;
+  const isEditMode = Boolean(route.params?.isEdit && reportToEdit?.id);
   // Input deskripsi laporan
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(reportToEdit?.description || "");
   // Pilihan kategori laporan
-  const [category, setCategory] = useState("inspection");
-  const [customCategory, setCustomCategory] = useState("");
+  const [category, setCategory] = useState(reportToEdit?.categoryId || "inspection");
+  const [customCategory, setCustomCategory] = useState(
+    reportToEdit?.categoryId && ["inspection", "visit", "maintenance"].includes(reportToEdit.categoryId)
+      ? ""
+      : reportToEdit?.categoryName || ""
+  );
   const [loading, setLoading] = useState(false);
-  const [photos, setPhotos] = useState<Array<{ uri?: string; base64?: string; watermarkedBase64?: string }>>([]);
+  const [photos, setPhotos] = useState<Array<{ uri?: string; base64?: string; watermarkedBase64?: string }>>(
+    reportToEdit?.photoUrl ? [{ uri: reportToEdit.photoUrl }] : []
+  );
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
   const [currentProcessingIndex, setCurrentProcessingIndex] = useState<number | null>(null);
   const [heading, setHeading] = useState<number>(0);
@@ -42,11 +51,15 @@ export default function CreateReportScreen() {
   const [watermarkAddress, setWatermarkAddress] = useState<any>(null);
   const watermarkAddressRef = useRef<any>(null);
   const previewUri = null;
-  const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedCoordinate, setSelectedCoordinate] = useState<{ latitude: number; longitude: number } | null>(
+    reportToEdit?.latitude !== undefined && reportToEdit?.longitude !== undefined
+      ? { latitude: reportToEdit.latitude, longitude: reportToEdit.longitude }
+      : null
+  );
   const [showCamera, setShowCamera] = useState(false);
   const [mapRegion, setMapRegion] = useState({
-    latitude: -6.200000,
-    longitude: 106.816666,
+    latitude: reportToEdit?.latitude ?? -6.200000,
+    longitude: reportToEdit?.longitude ?? 106.816666,
     latitudeDelta: 0.04,
     longitudeDelta: 0.04,
   });
@@ -364,27 +377,38 @@ export default function CreateReportScreen() {
             : "Pemeliharaan";
 
       const firstPhoto = photos[0];
-      const payload = {
+      const payload: any = {
         petugasId: user?.id || "unknown",
         petugasName: user?.nama || "Petugas",
         categoryId: category,
         categoryName: resolvedCategoryName,
         description,
-        photoBase64: (firstPhoto?.watermarkedBase64 || firstPhoto?.base64) || undefined,
-        photoName: firstPhoto ? `reports/${Date.now()}.jpg` : undefined,
         latitude: selectedCoordinate.latitude,
         longitude: selectedCoordinate.longitude,
-        status: "submitted",
       };
 
-      console.log("[report] sending payload", payload);
-      const response = await api.post("/reports", payload);
-      console.log("[report] submit response", response.status, response.data);
-      Alert.alert("Berhasil", "Laporan berhasil dikirim");
-      setDescription("");
-      setCustomCategory("");
-      setCategory("inspection");
-      setPhotos([]);
+      if (firstPhoto?.watermarkedBase64 || firstPhoto?.base64) {
+        payload.photoBase64 = firstPhoto.watermarkedBase64 || firstPhoto.base64;
+        payload.photoName = `reports/${Date.now()}.jpg`;
+      }
+
+      if (isEditMode && reportToEdit?.id) {
+        console.log("[report] sending update payload", payload);
+        const response = await api.patch(`/reports/${reportToEdit.id}`, payload);
+        console.log("[report] update response", response.status, response.data);
+        Alert.alert("Berhasil", "Laporan berhasil diperbarui");
+        navigation.goBack();
+      } else {
+        payload.status = "submitted";
+        console.log("[report] sending payload", payload);
+        const response = await api.post("/reports", payload);
+        console.log("[report] submit response", response.status, response.data);
+        Alert.alert("Berhasil", "Laporan berhasil dikirim");
+        setDescription("");
+        setCustomCategory("");
+        setCategory("inspection");
+        setPhotos([]);
+      }
     } catch (err: any) {
       const message = err?.response?.data?.message || "Laporan gagal dikirim";
       Alert.alert("Gagal", message);
@@ -449,8 +473,10 @@ export default function CreateReportScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerCard}>
-        <Text style={styles.title}>Buat Laporan Aktivitas</Text>
-        <Text style={styles.subtitle}>Tambahkan detail kegiatan, foto, dan lokasi GPS untuk monitoring lapangan.</Text>
+        <Text style={styles.title}>{isEditMode ? "Edit Laporan Aktivitas" : "Buat Laporan Aktivitas"}</Text>
+        <Text style={styles.subtitle}>
+          {isEditMode ? "Perbarui detail laporan pending sebelum diselesaikan." : "Tambahkan detail kegiatan, foto, dan lokasi GPS untuk monitoring lapangan."}
+        </Text>
       </View>
 
       <View style={styles.panel}>
@@ -586,9 +612,9 @@ export default function CreateReportScreen() {
             latitude={mapRegion.latitude}
             longitude={mapRegion.longitude}
             zoom={14}
-            interactive={photos.length === 0}
+            interactive={isEditMode || photos.length === 0}
             markerCoordinate={selectedCoordinate}
-            onCoordinateSelected={photos.length === 0 ? (coordinate) => setSelectedCoordinate(coordinate) : undefined}
+            onCoordinateSelected={isEditMode || photos.length === 0 ? (coordinate) => setSelectedCoordinate(coordinate) : undefined}
           />
         </View>
 
@@ -596,10 +622,10 @@ export default function CreateReportScreen() {
           {loading ? (
             <View style={styles.buttonContent}>
               <ActivityIndicator color="#ffffff" size="small" />
-              <Text style={styles.buttonText}>Mengirim...</Text>
+              <Text style={styles.buttonText}>{isEditMode ? "Memperbarui..." : "Mengirim..."}</Text>
             </View>
           ) : (
-            <Text style={styles.buttonText}>Kirim Laporan</Text>
+            <Text style={styles.buttonText}>{isEditMode ? "Simpan Perubahan" : "Kirim Laporan"}</Text>
           )}
         </TouchableOpacity>
       </View>

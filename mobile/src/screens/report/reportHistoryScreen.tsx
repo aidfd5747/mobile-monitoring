@@ -88,6 +88,10 @@ export default function ReportHistoryScreen() {
     navigation.navigate("ReportDetail", { report });
   };
 
+  const openReportEdit = (report: ReportItem) => {
+    navigation.navigate("CreateReport", { report, isEdit: true });
+  };
+
   // Hapus laporan dengan konfirmasi dari admin
   const deleteReport = async (report: ReportItem) => {
     Alert.alert("Hapus laporan", `Apakah Anda yakin ingin menghapus laporan milik ${report.petugasName || "petugas"}?`, [
@@ -141,6 +145,11 @@ export default function ReportHistoryScreen() {
             <Text style={styles.cardMeta}>{item.categoryName || "Kategori"}</Text>
             <Text style={styles.description}>{item.description}</Text>
             <Text style={styles.date}>{item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "-"}</Text>
+            {item.status !== "completed" ? (
+              <TouchableOpacity style={styles.editButton} onPress={() => openReportEdit(item)}>
+                <Text style={styles.editButtonText}>Edit</Text>
+              </TouchableOpacity>
+            ) : null}
             {isAdmin ? (
               <View style={styles.adminActions}>
                 <TouchableOpacity style={styles.actionButton} onPress={() => openReportDetail(item)}>
@@ -266,6 +275,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionText: {
+    color: "#ffffff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  editButton: {
+    backgroundColor: "#10b981",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  editButtonText: {
     color: "#ffffff",
     fontWeight: "700",
     fontSize: 12,

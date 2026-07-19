@@ -57,6 +57,39 @@ export class ReportController {
     }
   }
 
+  // Perbarui laporan yang belum selesai.
+  static async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const reportId = Array.isArray(id) ? id[0] : id;
+      const payload = req.body;
+      const authUser = (req as any).user;
+
+      console.log("[backend] update report request", { reportId, payload, user: authUser });
+
+      if (!reportId) {
+        return res.status(400).json({ message: "ID laporan wajib diisi" });
+      }
+
+      const report = await ReportService.updateReport(reportId, payload, authUser);
+      console.log("[backend] update report success", { reportId, updatedReport: report });
+
+      return res.json({ message: "Laporan berhasil diperbarui", report });
+    } catch (error: any) {
+      console.error(error);
+      if (error.message === "Report not found") {
+        return res.status(404).json({ message: "Laporan tidak ditemukan" });
+      }
+      if (error.message === "Cannot edit completed report") {
+        return res.status(400).json({ message: "Laporan selesai tidak dapat diedit" });
+      }
+      if (error.message === "Unauthorized") {
+        return res.status(403).json({ message: "Tidak memiliki izin untuk mengedit laporan ini" });
+      }
+      return res.status(500).json({ message: "Gagal memperbarui laporan" });
+    }
+  }
+
   // Hapus laporan dengan ID tertentu (hanya admin).
   static async delete(req: Request, res: Response) {
     try {

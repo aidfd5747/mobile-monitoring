@@ -49,6 +49,17 @@ export interface ReportPayload {
   status?: string;
 }
 
+export interface ReportUpdatePayload {
+  petugasName?: string;
+  categoryId?: string;
+  categoryName?: string;
+  description?: string;
+  photoBase64?: string;
+  photoName?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 const supabase = createClient(
   process.env.SUPABASE_URL || process.env.supabase_url || "",
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.supabase_service_role_key || process.env.SUPABASE_ANON_KEY || process.env.supabase_anon_key || ""
@@ -313,6 +324,86 @@ export class ReportService {
     return {
       id: docRef.id,
       deleted: true,
+    };
+  }
+
+  // Perbarui laporan yang belum selesai.
+  static async updateReport(id: string, payload: ReportUpdatePayload, authUser: { id?: string; role?: string }) {
+    console.log("[backend] updating report", { reportId: id, payload, authUser });
+    const docRef = firestore.collection("reports").doc(id);
+    const snapshot = await docRef.get();
+
+    if (!snapshot.exists) {
+      throw new Error("Report not found");
+    }
+
+    const currentReport = snapshot.data() as FirestoreReport;
+
+    if (currentReport.status === "completed") {
+      throw new Error("Cannot edit completed report");
+    }
+
+    if (authUser?.role !== "admin" && currentReport.petugasId !== authUser?.id) {
+      throw new Error("Unauthorized");
+    }
+
+    const updates: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (payload.petugasName) {
+      updates.petugasName = payload.petugasName;
+    }
+    if (payload.categoryId) {
+      updates.categoryId = payload.categoryId;
+    }
+    if (payload.categoryName) {
+      updates.categoryName = payload.categoryName;
+    }
+    if (payload.description) {
+      updates.description = payload.description;
+    }
+    if (payload.latitude !== undefined) {
+      updates.latitude = payload.latitude;
+    }
+    if (payload.longitude !== undefined) {
+      updates.longitude = payload.longitude;
+    }
+
+    if (payload.photoBase64) {
+      const bucketName = process.env.SUPABASE_BUCKET || "reports";
+      const fileName = payload.photoName || `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const buffer = Buffer.from(payload.photoBase64, "base64");
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, buffer, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("[backend] photo upload failed", uploadError);
+        throw new Error("Gagal mengunggah foto laporan");
+      }
+
+      const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+      if (!data?.publicUrl) {
+        console.error("[backend] failed to get public url for uploaded photo", { fileName, data });
+        throw new Error("Gagal mendapatkan URL foto laporan");
+      }
+
+      updates.photoUrl = data.publicUrl;
+    }
+
+    await docRef.update(updates);
+
+    const updatedSnapshot = await docRef.get();
+    const updatedData = updatedSnapshot.data();
+
+    return {
+      id: docRef.id,
+      ...updatedData,
     };
   }
 

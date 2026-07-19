@@ -40,20 +40,43 @@ function NotificationBootstrap() {
           const permission = await Notifications.requestPermissionsAsync();
           console.log("[push] permissions", permission);
 
-          const pushToken = await Notifications.getExpoPushTokenAsync();
-          console.log("[push] expo token", pushToken?.data);
+          // Retry helper for flaky FCM / Play Services errors
+          const fetchPushTokenWithRetry = async (attempts = 5, delay = 1000) => {
+            let lastError: any = null;
+            for (let i = 0; i < attempts; i++) {
+              try {
+                const t = await Notifications.getExpoPushTokenAsync();
+                return t;
+              } catch (err) {
+                lastError = err;
+                console.warn(`[push] getExpoPushTokenAsync attempt ${i + 1} failed`, err);
+                // SERVICE_NOT_AVAILABLE often transient; wait and retry
+                await new Promise((res) => setTimeout(res, delay * Math.pow(2, i)));
+              }
+            }
+            throw lastError;
+          };
 
-          if (pushToken?.data) {
-            const response = await api.post("/auth/push-token", {
-              expoPushToken: pushToken.data,
-            });
-            console.log("[push] server save response", response.data);
-            registered.current = true;
-            console.log("[push] token saved to server", pushToken.data);
+          try {
+            const pushToken = await fetchPushTokenWithRetry();
+            console.log("[push] expo token", pushToken?.data);
+
+            if (pushToken?.data) {
+              const response = await api.post("/auth/push-token", {
+                expoPushToken: pushToken.data,
+              });
+              console.log("[push] server save response", response.data);
+              registered.current = true;
+              console.log("[push] token saved to server", pushToken.data);
+            }
+          } catch (err) {
+            console.error("[push] token registration ultimately failed", err);
+            // Helpful hint for debugging
+            console.info("[push] hints: ensure device has Google Play Services, network connectivity, and that the app is a standalone build with FCM configured (EAS build). If using emulator, use an image with Google Play.");
           }
         }
       } catch (error) {
-        console.log("[push] token registration failed", error);
+        console.log("[push] token registration failed outer", error);
       }
 
       subscription = Notifications.addNotificationReceivedListener((notification) => {

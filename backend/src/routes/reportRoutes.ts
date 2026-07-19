@@ -12,6 +12,8 @@ router.post("/", authMiddleware, ReportController.create);
 router.get("/notifications", authMiddleware, ReportController.notifications);
 // Ambil daftar laporan.
 router.get("/", authMiddleware, ReportController.list);
+// Perbarui laporan yang belum selesai.
+router.patch("/:id", authMiddleware, ReportController.update);
 // Hapus laporan berdasarkan ID (admin saja).
 router.delete("/:id", authMiddleware, adminOnly, ReportController.delete);
 // Perbarui status laporan (admin saja).

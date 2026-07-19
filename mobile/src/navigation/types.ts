@@ -2,7 +2,7 @@ export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
   CreateUser: undefined;
-  CreateReport: { autoCamera?: boolean } | undefined;
+  CreateReport: { autoCamera?: boolean; report?: any; isEdit?: boolean } | undefined;
   ReportDetail: { report?: any; reportId?: string } | undefined;
 };
 
