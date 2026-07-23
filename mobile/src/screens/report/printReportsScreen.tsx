@@ -10,11 +10,11 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import api from "../../services/api";
 import { AuthContext } from "../../context/authContext";
 import { formatReportDate } from "../../utils/date";
@@ -43,6 +43,8 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
+
+const defaultLogoUri = Image.resolveAssetSource(require("../../assets/logo.png")).uri;
 
 // Hitung grid tile OpenStreetMap dan offset untuk menempatkan posisi koordinat di tengah pratinjau
 // Hitung grid tile OpenStreetMap untuk preview peta dan offset penempatan marker
@@ -231,7 +233,14 @@ const composeTilesToSvgDataUrl = (tileBase64s: string[], fractionX: number, frac
 };
 
 // Buat HTML laporan PDF dengan format yang mengikuti `format_laporan.html`
-const buildPdfHtml = (reports: ReportItem[]) => {
+const buildPdfHtml = (
+  reports: ReportItem[],
+  logoSrc?: string,
+  filters?: {
+    selectedYear?: string;
+    selectedMonth?: string;
+  }
+) => {
   const rows = reports
     .map((report, index) => {
       const date = formatReportDate(report.createdAt);
@@ -258,6 +267,15 @@ const buildPdfHtml = (reports: ReportItem[]) => {
     year: "numeric",
   });
 
+  const titleLabel =
+    filters?.selectedYear && filters.selectedYear !== "All" && filters?.selectedMonth && filters.selectedMonth !== "All"
+      ? `LAPORAN KEGIATAN BULAN ${filters.selectedMonth.toUpperCase()}`
+      : filters?.selectedYear && filters.selectedYear !== "All"
+        ? `LAPORAN KEGIATAN TAHUN ${filters.selectedYear}`
+        : filters?.selectedMonth && filters.selectedMonth !== "All"
+          ? `LAPORAN BULAN ${filters.selectedMonth.toUpperCase()}`
+          : "LAPORAN KEGIATAN";
+
   return `<!DOCTYPE html>
   <html lang="id">
     <head>
@@ -265,14 +283,27 @@ const buildPdfHtml = (reports: ReportItem[]) => {
       <style>
         @page { size: A4 landscape; margin: 16mm; }
         body { font-family: "Times New Roman", serif; color: #000; margin: 24px; }
-        .header { display: flex; align-items: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-        .logo { width: 90px; height: 90px; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 20px; }
+        .header { display: flex; align-items: center; border-bottom: 3px solid #000; padding-bottom: 12px; margin-bottom: 20px; gap: 16px; }
+        .logo { width: 92px; height: 92px; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; overflow: hidden; background: #fff; flex-shrink: 0; }
+        .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .logo-placeholder { font-size: 12px; text-align: center; }
         .header-text { flex: 1; text-align: center; }
         .header-text h2, .header-text h3, .header-text p { margin: 2px; }
-        .header-text h2 { font-size: 18px; text-transform: uppercase; }
+        .header-title { font-size: 11px; font-weight: 700; letter-spacing: 0.7px; margin-bottom: 3px; }
+        .header-subtitle { font-size: 12px; font-weight: 700; margin-top: 3px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+        .header-text h2 { font-size: 20px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.6px; }
         .header-text h3 { font-size: 14px; margin-top: 4px; }
-        .header-text p { font-size: 12px; }
-        .title { text-align: center; margin-top: 24px; margin-bottom: 16px; }
+        .header-text p { font-size: 11px; line-height: 1.3; }
+        .kop-line { border-top: 1px solid #000; margin-top: 8px; }
+        .doc-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 40px; margin-top: 10px; margin-bottom: 18px; }
+        .doc-meta-left { width: 42%; font-size: 11px; line-height: 1.6; padding-top: 6px; }
+        .doc-meta-left .field-row { display: flex; align-items: center; min-height: 24px; }
+        .doc-meta-left .field-label { min-width: 72px; }
+        .doc-meta-right { width: 20%; font-size: 11px; line-height: 1.5; text-align: left; margin-left: auto; padding-top: 2px; }
+        .doc-meta-right .date-line { margin-bottom: 12px; font-weight: 700; }
+        .doc-meta-right .recipient-block { margin-top: 8px; }
+        .doc-meta-right .underline { display: inline-block; min-width: 110px; border-bottom: 1px solid #000; padding-bottom: 1px; }
+        .title { text-align: center; margin-top: 10px; margin-bottom: 16px; }
         .title h3 { margin: 0; text-decoration: underline; font-size: 16px; }
         .info { display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
@@ -288,24 +319,47 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         .map-img { width: 160px; height: 120px; object-fit: cover; border-radius: 4px; display: block; }
         .image-cell { display: block; width: 100%; max-width: 100%; overflow: hidden; }
         .image-cell img { width: 100%; height: auto; object-fit: cover; display: block; border-radius: 4px; }
-        .footer { width: 300px; margin-left: auto; margin-top: 44px; text-align: center; font-size: 12px; }
+        .footer-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-top: 44px; }
+        .footer { width: 300px; text-align: center; font-size: 12px; }
+        .footeradmin { width: 300px; text-align: center; font-size: 12px; }
         .signature { margin-top: 60px; }
+        .signatureadmin { margin-top: 80px; }
+        .spasi { margin-left: 16px; }
         @media print { body { margin: 20px; } }
       </style>
     </head>
     <body>
       <div class="header">
-        <div class="logo">LOGO</div>
+        <div class="logo">${logoSrc ? `<img src="${escapeHtml(logoSrc)}" alt="Logo instansi" />` : `<div class="logo-placeholder">LOGO</div>`}</div>
         <div class="header-text">
-          <h2>DINAS PEKERJAAN UMUM DAN PENATAAN RUANG</h2>
-          <h3>Monitoring Kegiatan Lapangan</h3>
-          <p>Jl. Tuanku Tambusai, Bagan Besar, Kecamatan. Bukit Kapur, Kota Dumai, Riau</p>
-          <p>28826</p>
+          <div class="header-title">PEMERINTAH KOTA DUMAI</div>
+          <h2>DINAS PEKERJAAN UMUM</h2>
+          <div class="header-subtitle">BIDANG BINA MARGA</div>
+          <p>Jl. Tuanku Tambusai, Bagan Besar, Kecamatan Bukit Kapur, Kota Dumai, Riau</p>
+          <p>Kode Pos 28826</p>
           <p>Email : pu.kotadumai@gmail.com</p>
         </div>
       </div>
+      <div class="kop-line"></div>
+      <div class="doc-meta">
+        <div class="doc-meta-left">
+          <div class="field-row"><span class="field-label">Nomor</span><span>:</span></div>
+          <div class="field-row"><span class="field-label">Lampiran</span><span>:</span></div>
+          <div class="field-row"><span class="field-label">Perihal</span><span>:</span></div>
+        </div>
+        <div class="doc-meta-right">
+          <div class="date-line">Dumai, ${escapeHtml(printedDate)}</div>
+          <div class="recipient-block">
+            <div>Kepada</div>
+            <div>Yth,</div>
+            <div>Kepala Bidang Bina Marga</div>
+            <div>di- </div>
+            <div class="spasi">Dumai</div>
+          </div>
+        </div>
+      </div>
       <div class="title">
-        <h3>LAPORAN MONITORING KEGIATAN</h3>
+        <h3>${titleLabel}</h3>
       </div>
       <table>
         <thead>
@@ -320,11 +374,22 @@ const buildPdfHtml = (reports: ReportItem[]) => {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="footer">
-        <p>Dumai, ${escapeHtml(printedDate)}</p>
-        <p>Mengetahui,</p>
-        <div class="signature">
-          <p><strong>Admin</strong></p>
+      <div class="footer-row">
+        <div class="footeradmin">
+          <p>Dumai, ${escapeHtml(printedDate)}</p>
+          <p>Dibuat Oleh,</p>
+          <div class="signatureadmin">
+            <p><strong>Admin</strong></p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>Dumai, ${escapeHtml(printedDate)}</p>
+          <p>Diketahui Oleh,</p>
+          <p>Kepala Bidang Bina Marga</p>
+          <div class="signature">
+            <p><strong><u>Yomi Idriansyah, S.T</u></strong></p>
+            <p>NIP. 198501014200904 1 001</p>
+          </div>
         </div>
       </div>
     </body>
@@ -344,6 +409,7 @@ export default function PrintReportsScreen() {
   const [loading, setLoading] = useState(true);
   // Status sedang membuat PDF
   const [generating, setGenerating] = useState(false);
+  const [generatingMessage, setGeneratingMessage] = useState("Mengolah laporan...");
   const [selectedYear, setSelectedYear] = useState<string>("All");
   const [selectedMonth, setSelectedMonth] = useState<string>("All");
   const [selectedDay, setSelectedDay] = useState<string>("All");
@@ -460,6 +526,43 @@ export default function PrintReportsScreen() {
     setSelectedIds(filteredReports.map((item) => item.id));
   };
 
+  const savePdfToDevice = async (sourceUri: string, fileName: string) => {
+    try {
+      Alert.alert("Pilih folder penyimpanan", "Pilih folder Download agar file PDF tampil di folder unduhan perangkat Anda.");
+      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!permissions.granted) {
+        throw new Error("storage access denied");
+      }
+
+      const createdUri = await FileSystem.StorageAccessFramework.createFileAsync(
+        permissions.directoryUri,
+        fileName,
+        "application/pdf"
+      );
+
+      const base64 = await FileSystem.readAsStringAsync(sourceUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      await FileSystem.writeAsStringAsync(createdUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      return createdUri;
+    } catch (err) {
+      console.warn("[print] save pdf to selected folder failed", err);
+      const fallbackDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || "";
+      const fallbackPath = `${fallbackDir}${fileName}`;
+
+      if (fallbackDir) {
+        await FileSystem.makeDirectoryAsync(fallbackDir, { intermediates: true });
+      }
+      await FileSystem.deleteAsync(fallbackPath, { idempotent: true });
+      await FileSystem.copyAsync({ from: sourceUri, to: fallbackPath });
+      return fallbackPath;
+    }
+  };
+
   // Buat dan bagikan file PDF berdasarkan laporan yang dipilih
   const handleGeneratePdf = async () => {
     const itemsToExport = reports.filter((report) => selectedIds.includes(report.id));
@@ -473,6 +576,7 @@ export default function PrintReportsScreen() {
     }
 
     setGenerating(true);
+    setGeneratingMessage("Mengolah laporan...");
     try {
       const enrichedItems = await Promise.all(
         itemsToExport.map(async (report) => {
@@ -518,72 +622,34 @@ export default function PrintReportsScreen() {
         })
       );
 
-      const html = buildPdfHtml(enrichedItems);
+      setGeneratingMessage("Membuat file PDF...");
+      const html = buildPdfHtml(enrichedItems, defaultLogoUri, {
+        selectedYear,
+        selectedMonth,
+      });
       console.log("[print] pdf html ready", html.length);
       console.log("[print] starting pdf generation");
       const file = await Print.printToFileAsync({ html, width: 842, height: 595 });
       console.log("[print] pdf created", file.uri);
       const fileInfo = await FileSystem.getInfoAsync(file.uri);
       console.log("[print] pdf file info", fileInfo);
-      let canShare = false;
+
       try {
-        canShare = await Sharing.isAvailableAsync();
+        setGeneratingMessage("Menyimpan PDF ke perangkat...");
+        const destinationFileName = "Laporan Kegiatan.pdf";
+        const dest = await savePdfToDevice(file.uri, destinationFileName);
+        const destInfo = await FileSystem.getInfoAsync(dest);
+        console.log("[print] saved pdf info", destInfo);
+        Alert.alert("Berhasil", `PDF berhasil disimpan sebagai ${destinationFileName}\nLokasi: ${dest}`);
       } catch (err) {
-        console.warn("[print] Sharing.isAvailableAsync failed", err);
-        canShare = false;
-      }
-      console.log("[print] share available", canShare);
-
-      // Try normal sharing first. If not available, copy to cache and try again.
-      const tryShare = async (uri: string) => {
-        try {
-          console.log("[print] starting share dialog", uri);
-          const shareResult = await Sharing.shareAsync(uri, {
-            mimeType: "application/pdf",
-            dialogTitle: "Bagikan laporan PDF",
-            UTI: "com.adobe.pdf",
-          });
-          console.log("[print] share result", shareResult);
-          return true;
-        } catch (err) {
-          console.warn("[print] share failed", err);
-          return false;
-        }
-      };
-
-      let shared = false;
-      if (canShare) {
-        shared = await tryShare(file.uri);
-      }
-
-      if (!shared) {
-        // fallback: copy file to a public cache location and try share again
-        try {
-          const destDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
-          const dest = `${destDir}laporan-monitoring.pdf`;
-          console.log("[print] copying pdf to", dest);
-          await FileSystem.copyAsync({ from: file.uri, to: dest });
-          const destInfo = await FileSystem.getInfoAsync(dest);
-          console.log("[print] copied file info", destInfo);
-          const shareOk = await tryShare(dest);
-          if (!shareOk) {
-            Alert.alert(
-              "Berhasil membuat PDF",
-              `File disimpan di: ${dest}`
-            );
-          }
-        } catch (err) {
-          console.warn("[print] fallback share failed", err);
-          Alert.alert(
-            "Gagal membagikan",
-            `PDF dibuat tetapi tidak dapat dibagikan: ${file.uri}`
-          );
-        }
+        console.warn("[print] save pdf failed", err);
+        Alert.alert("Gagal", "Tidak dapat menyimpan file PDF ke perangkat");
       }
     } catch (error) {
       Alert.alert("Gagal", "Tidak dapat membuat file PDF");
     } finally {
       setGenerating(false);
+      setGeneratingMessage("Mengolah laporan...");
     }
   };
 
@@ -700,14 +766,22 @@ export default function PrintReportsScreen() {
           disabled={generating}
         >
           {generating ? (
-            <ActivityIndicator color="#ffffff" size="small" />
+            <View style={styles.loadingButtonContent}>
+              <ActivityIndicator color="#ffffff" size="small" />
+              <Text style={styles.primaryButtonText}>Memproses...</Text>
+            </View>
           ) : (
             <Text style={styles.primaryButtonText}>Buat PDF</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {generating ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>{generatingMessage}</Text>
+        </View>
+      ) : loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color="#2563eb" />
           <Text style={styles.loadingText}>Memuat laporan...</Text>
@@ -803,6 +877,13 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     color: "#64748b",
+    textAlign: "center",
+  },
+  loadingButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
   listContent: {
     paddingBottom: 24,
